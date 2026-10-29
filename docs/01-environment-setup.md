@@ -24,6 +24,12 @@ winget install Python.Python.2 --version 2.7.18150 --silent
 # 관리자 권한 (UAC 승인 필요)
 winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --wait --add Microsoft.VisualStudio.Component.VC.v141.x86.x64 --add Microsoft.VisualStudio.Component.Windows10SDK.19041"
 ```
+- v141만 지정해 설치하면 CMake의 `Visual Studio 17 2022` 생성기가 요구하는 v170 MSBuild 파일이 빠진다. 아래 명령으로 `VC.Tools.x86.x64`를 추가한다(Phase 2에서 확인).
+  `--quiet`/`--passive`는 **관리자 권한으로 승격된 셸**에서만 동작한다(그렇지 않으면 종료 코드 5007). 일반 셸이면 `Start-Process -Verb RunAs`로 UAC 승인 창을 띄운다.
+  ```powershell
+  $bt = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\2022\BuildTools"
+  Start-Process "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe" -Verb RunAs -Wait -PassThru -ArgumentList "modify --installPath `"$bt`" --add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --passive --norestart"
+  ```
 - `--scope user` 설치 관리자는 두 패키지 모두 없어서 스코프 없이 설치했다. MSI가 UAC 승인을 기다린다.
 - winget의 CMake는 4.x가 최신이므로 버전을 반드시 고정한다.
 - Python 2.7.18은 MSI가 x64이지만 cocos 콘솔 실행용일 뿐이라 빌드 대상(Win32)과 무관하다.

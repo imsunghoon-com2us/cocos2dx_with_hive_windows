@@ -21,3 +21,6 @@ Release.win32/
 
 # OS
 Thumbs.db
+
+# Local editor settings (absolute paths)
+.vscode/

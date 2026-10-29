@@ -1,4 +1,4 @@
-# 개발 환경 점검. 모든 항목이 OK이면 exit 0, 하나라도 실패하면 exit 1.
+﻿# 개발 환경 점검. 모든 항목이 OK이면 exit 0, 하나라도 실패하면 exit 1.
 $ErrorActionPreference = 'Continue'
 $fail = 0
 
@@ -40,6 +40,16 @@ if (Test-Path $vswhere) {
     $vsPath = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.v141.x86.x64 -property installationPath
 }
 Report 'MSVC v141' ([bool]$vsPath) $(if ($vsPath) { $vsPath } else { 'VC.v141.x86.x64 component not found' })
+
+# CMake의 'Visual Studio 17 2022' 생성기는 v170 MSBuild 파일(VC.Tools.x86.x64 컴포넌트)을 요구한다.
+$v170 = if ($vsPath) { Join-Path $vsPath 'MSBuild\Microsoft\VC\v170\Microsoft.Cpp.Default.props' } else { $null }
+Report 'MSBuild v170' ($v170 -and (Test-Path $v170)) $(if ($v170 -and (Test-Path $v170)) { 'found' } else { 'VC.Tools.x86.x64 component missing (see docs/01-environment-setup.md)' })
+
+# Windows SDK 10.0.19041.0 (32비트 레지스트리 뷰 기준 경로에 Lib가 있어야 한다)
+$kitsKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey('LocalMachine', 'Registry32').OpenSubKey('SOFTWARE\Microsoft\Windows Kits\Installed Roots')
+$kits = if ($kitsKey) { $kitsKey.GetValue('KitsRoot10') } else { $null }
+$ucrt = if ($kits) { Join-Path $kits 'Lib\10.0.19041.0\ucrt\x86\ucrtd.lib' } else { $null }
+Report 'Win SDK 19041' ($ucrt -and (Test-Path $ucrt)) $(if ($ucrt -and (Test-Path $ucrt)) { $kits } else { 'Lib\10.0.19041.0\ucrt not found' })
 
 # cdb (Debugging Tools for Windows)
 $cdb = Find-Exe 'cdb' @("${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x86\cdb.exe")
