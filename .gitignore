@@ -1,0 +1,23 @@
+# cocos2d-x engine (restored by tools/setup_engine.ps1)
+DodgeGame/cocos2d/
+
+# Build outputs
+DodgeGame/build/
+DodgeGame/proj.win32/Debug.win32/
+DodgeGame/proj.win32/Release.win32/
+Debug.win32/
+Release.win32/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
+*.ipch
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OS
+Thumbs.db
