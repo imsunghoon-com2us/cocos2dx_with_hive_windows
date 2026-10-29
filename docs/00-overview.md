@@ -50,4 +50,4 @@ cocos2dx_with_hive_windows/
 - [x] Phase 1: 개발 환경 구축
 - [x] Phase 2: 엔진 준비, 프로젝트 생성, 템플릿 빌드
 - [x] Phase 3: 미니게임 구현
-- [ ] Phase 4: 리뷰와 디버깅
+- [x] Phase 4: 리뷰와 디버깅

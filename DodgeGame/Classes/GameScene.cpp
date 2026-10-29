@@ -15,6 +15,12 @@ const float kHitShrink = 6.0f;          // 플레이어 판정 영역을 한 변
 const float kMinObstacle = 24.0f;
 const float kMaxObstacle = 56.0f;
 const int kScorePerDodge = 10;
+
+// 창 이동·크기 조절로 루프가 멈췄다 돌아오면 dt가 매우 커진다. 장애물이 한 프레임에
+// 플레이어를 통과(터널링)하고 스폰이 몰리지 않도록 한 프레임에 처리할 시간의 상한을 둔다.
+const float kMaxFrameDt = 1.0f / 30.0f;
+// 죽는 순간 진행 중이던 입력이 곧바로 재시작으로 이어지지 않도록 하는 지연.
+const float kRestartDelay = 0.5f;
 }
 
 Scene* GameScene::createScene()
@@ -89,7 +95,7 @@ void GameScene::setupInput()
             break;
         case EventKeyboard::KeyCode::KEY_R:
         case EventKeyboard::KeyCode::KEY_SPACE:
-            if (_state == State::GameOver)
+            if (canRestart())
             {
                 restart();
             }
@@ -123,7 +129,10 @@ void GameScene::setupInput()
     touch->onTouchBegan = [this](Touch* t, Event*) {
         if (_state == State::GameOver)
         {
-            restart();
+            if (canRestart())
+            {
+                restart();
+            }
             return true;
         }
         _touching = true;
@@ -138,11 +147,13 @@ void GameScene::setupInput()
 
 void GameScene::update(float dt)
 {
-    if (_state != State::Playing)
+    if (_state == State::GameOver)
     {
+        _gameOverElapsed += dt;
         return;
     }
 
+    dt = std::min(dt, kMaxFrameDt);
     _elapsed += dt;
     updatePlayer(dt);
     updateSpawn(dt);
@@ -294,6 +305,11 @@ void GameScene::gameOver()
     auto hint = Label::createWithTTF("Press R / Space or click to restart", kFont, 20);
     hint->setPosition(center - origin + Vec2(0.0f, -50.0f));
     _gameOverPanel->addChild(hint);
+}
+
+bool GameScene::canRestart() const
+{
+    return _state == State::GameOver && _gameOverElapsed >= kRestartDelay;
 }
 
 void GameScene::restart()

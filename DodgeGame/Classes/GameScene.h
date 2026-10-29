@@ -3,6 +3,9 @@
 
 #include "cocos2d.h"
 
+#include <algorithm>
+#include <vector>
+
 // 떨어지는 물체 피하기. 한 판이 곧 한 씬이며, 재시작은 새 씬으로 교체한다.
 class GameScene : public cocos2d::Layer
 {
@@ -39,11 +42,13 @@ private:
 
     void addScore();
     void gameOver();
+    bool canRestart() const;
     void restart();
 
     State _state = State::Playing;
     bool _restarting = false;
     float _elapsed = 0.0f;
+    float _gameOverElapsed = 0.0f;
     float _spawnTimer = 0.0f;
     int _score = 0;
     int _bestScore = 0;

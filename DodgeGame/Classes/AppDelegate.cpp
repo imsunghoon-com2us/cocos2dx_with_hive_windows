@@ -90,8 +90,10 @@ bool AppDelegate::applicationDidFinishLaunching() {
         director->setOpenGLView(glview);
     }
 
-    // turn on display FPS
+    // show FPS/draw-call stats in Debug builds only (they cover the play area otherwise)
+#if COCOS2D_DEBUG
     director->setDisplayStats(true);
+#endif
 
     // set FPS. the default value is 1.0/60 if you don't call this
     director->setAnimationInterval(1.0f / 60);
