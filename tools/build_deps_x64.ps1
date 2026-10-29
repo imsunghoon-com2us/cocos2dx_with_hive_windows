@@ -8,7 +8,7 @@ param(
     [string[]]$Only,
     [switch]$Force,
     [string]$EngineRoot = (Join-Path (Split-Path $PSScriptRoot -Parent | Split-Path -Parent) 'cocos2d-x-3.17.2'),
-    [string]$WorkRoot = 'C:\Project\cocos2d-deps-x64'
+    [string]$WorkRoot = (Join-Path (Split-Path $PSScriptRoot -Parent | Split-Path -Parent) 'cocos2d-deps-x64')
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
