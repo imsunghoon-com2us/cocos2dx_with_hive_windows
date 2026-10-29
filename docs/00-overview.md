@@ -49,5 +49,5 @@ cocos2dx_with_hive_windows/
 - [x] Phase 0: 계획 문서화, Claude Code·git 초기화, GitHub 저장소
 - [x] Phase 1: 개발 환경 구축
 - [x] Phase 2: 엔진 준비, 프로젝트 생성, 템플릿 빌드
-- [ ] Phase 3: 미니게임 구현
+- [x] Phase 3: 미니게임 구현
 - [ ] Phase 4: 리뷰와 디버깅
