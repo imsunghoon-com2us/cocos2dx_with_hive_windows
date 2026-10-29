@@ -51,6 +51,12 @@ $kits = if ($kitsKey) { $kitsKey.GetValue('KitsRoot10') } else { $null }
 $ucrt = if ($kits) { Join-Path $kits 'Lib\10.0.19041.0\ucrt\x86\ucrtd.lib' } else { $null }
 Report 'Win SDK 19041' ($ucrt -and (Test-Path $ucrt)) $(if ($ucrt -and (Test-Path $ucrt)) { $kits } else { 'Lib\10.0.19041.0\ucrt not found' })
 
+# x64 빌드 도구: v141 x64 컴파일러/링커와 UCRT x64 라이브러리
+$cl64 = if ($vsPath) { Get-ChildItem (Join-Path $vsPath 'VC\Tools\MSVC') -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '14.16.*' } | ForEach-Object { Join-Path $_.FullName 'bin\HostX64\x64\cl.exe' } | Where-Object { Test-Path $_ } | Select-Object -First 1 } else { $null }
+Report 'MSVC v141 x64' ([bool]$cl64) $(if ($cl64) { $cl64 } else { 'bin\HostX64\x64\cl.exe (14.16.*) not found' })
+$ucrt64 = if ($kits) { Join-Path $kits 'Lib\10.0.19041.0\ucrt\x64\ucrtd.lib' } else { $null }
+Report 'UCRT x64' ($ucrt64 -and (Test-Path $ucrt64)) $(if ($ucrt64 -and (Test-Path $ucrt64)) { 'found' } else { 'Lib\10.0.19041.0\ucrt\x64 not found' })
+
 # cdb (Debugging Tools for Windows)
 $cdb = Find-Exe 'cdb' @("${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x86\cdb.exe")
 Report 'cdb' ([bool]$cdb) $(if ($cdb) { $cdb } else { 'not found' })

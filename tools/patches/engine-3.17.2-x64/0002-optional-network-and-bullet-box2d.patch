@@ -1,0 +1,147 @@
+--- a/external/CMakeLists.txt
++++ b/external/CMakeLists.txt
+@@ -3,17 +3,23 @@
+ 
+ add_library(external empty.cpp)
+ 
+-add_subdirectory(Box2D)
++# COCOS_USE_NETWORK / COCOS_USE_BULLET_BOX2D are declared in cocos/CMakeLists.txt (default ON).
++# The x64 build turns them OFF: there are no x64 prebuilts of these libraries.
++if(COCOS_USE_BULLET_BOX2D)
++    add_subdirectory(Box2D)
++    add_subdirectory(bullet)
++endif()
+ add_subdirectory(chipmunk)
+ add_subdirectory(freetype2)
+ add_subdirectory(recast)
+-add_subdirectory(bullet)
+ add_subdirectory(jpeg)
+-add_subdirectory(openssl)
++if(COCOS_USE_NETWORK)
++    add_subdirectory(openssl)
++    add_subdirectory(uv)
++    add_subdirectory(websockets)
++endif()
+ add_subdirectory(tiff)
+-add_subdirectory(uv)
+ add_subdirectory(webp)
+-add_subdirectory(websockets)
+ add_subdirectory(tinyxml2)
+ add_subdirectory(xxhash)
+ add_subdirectory(xxtea)
+@@ -23,19 +29,27 @@
+ add_subdirectory(poly2tri)
+ add_subdirectory(md5)
+ 
++if(COCOS_USE_BULLET_BOX2D)
++    target_link_libraries(external
++        ext_box2d
++        ext_bullet
++    )
++endif()
++if(COCOS_USE_NETWORK)
++    target_link_libraries(external
++        ext_uv
++        ext_ssl
++        ext_crypto
++        ext_websockets
++    )
++endif()
+ target_link_libraries(external
+-    ext_box2d
+     ext_chipmunk
+     ext_freetype
+     ext_recast
+     ext_jpeg
+-    ext_uv
+     ext_webp
+-    ext_bullet
+-    ext_ssl
+-    ext_crypto
+     ext_tiff
+-    ext_websockets
+     ext_tinyxml2
+     ext_xxhash
+     ext_xxtea
+@@ -63,10 +77,12 @@
+ endif()
+ 
+ if(NOT LINUX)
+-    add_subdirectory(curl)
++    if(COCOS_USE_NETWORK)
++        add_subdirectory(curl)
++        target_link_libraries(external ext_curl)
++    endif()
+     add_subdirectory(png)
+-    target_link_libraries(external 
+-        ext_curl
++    target_link_libraries(external
+         ext_png
+     )
+ endif(NOT LINUX)
+--- a/cocos/CMakeLists.txt
++++ b/cocos/CMakeLists.txt
+@@ -34,6 +34,11 @@
+ 
+ set(COCOS_CORE_LIB cocos2d)
+ 
++# Optional modules. The defaults keep the stock behaviour. The x64 build turns them OFF because
++# there are no x64 builds of curl/openssl/libwebsockets/libuv/Box2D/Bullet (see tools/build_deps_x64.ps1).
++option(COCOS_USE_NETWORK "Build the network module (HttpClient, WebSocket, SocketIO, Downloader)" ON)
++option(COCOS_USE_BULLET_BOX2D "Link Box2D and Bullet (3D physics)" ON)
++
+ include(2d/CMakeLists.txt)
+ include(3d/CMakeLists.txt)
+ include(platform/CMakeLists.txt)
+@@ -46,7 +51,9 @@
+ include(base/CMakeLists.txt)
+ include(deprecated/CMakeLists.txt)
+ include(ui/CMakeLists.txt)
+-include(network/CMakeLists.txt)
++if(COCOS_USE_NETWORK)
++    include(network/CMakeLists.txt)
++endif()
+ include(audio/CMakeLists.txt)
+ include(storage/CMakeLists.txt)
+ 
+@@ -119,6 +126,11 @@
+ 
+ add_library(cocos2d ${COCOS_SRC})
+ 
++if(NOT COCOS_USE_BULLET_BOX2D)
++    # physics3d sources are guarded by CC_ENABLE_BULLET_INTEGRATION, which ccConfig.h only defines when this is non-zero
++    target_compile_definitions(cocos2d PUBLIC CC_USE_3D_PHYSICS=0)
++endif()
++
+ # use external libs
+ add_subdirectory(${COCOS2DX_ROOT_PATH}/external ${ENGINE_BINARY_PATH}/external)
+ target_link_libraries(cocos2d external)
+--- a/extensions/CMakeLists.txt
++++ b/extensions/CMakeLists.txt
+@@ -180,11 +180,6 @@
+ 
+ set(COCOS_EXTENSIONS_SRC
+ 
+-    ../extensions/assets-manager/AssetsManager.cpp
+-    ../extensions/assets-manager/AssetsManagerEx.cpp
+-    ../extensions/assets-manager/CCEventAssetsManagerEx.cpp
+-    ../extensions/assets-manager/CCEventListenerAssetsManagerEx.cpp
+-    ../extensions/assets-manager/Manifest.cpp
+     ../extensions/GUI/CCControlExtension/CCControl.cpp
+     ../extensions/GUI/CCControlExtension/CCControlButton.cpp
+     ../extensions/GUI/CCControlExtension/CCControlColourPicker.cpp
+@@ -353,3 +348,14 @@
+     ../extensions/Particle3D/PU/CCPUSlaveBehaviour.cpp
+     ../extensions/Particle3D/PU/CCPUSlaveBehaviourTranslator.cpp
+     )
++
++# assets-manager downloads through libcurl (network module); skipped when COCOS_USE_NETWORK is OFF.
++if(COCOS_USE_NETWORK)
++    list(APPEND COCOS_EXTENSIONS_SRC
++        ../extensions/assets-manager/AssetsManager.cpp
++        ../extensions/assets-manager/AssetsManagerEx.cpp
++        ../extensions/assets-manager/CCEventAssetsManagerEx.cpp
++        ../extensions/assets-manager/CCEventListenerAssetsManagerEx.cpp
++        ../extensions/assets-manager/Manifest.cpp
++    )
++endif()

@@ -1,15 +1,17 @@
-﻿# DodgeGame 빌드 (CMake + VS 2022 Build Tools, MSVC v141, Win32).
-#   tools\build.ps1 -Config Debug|Release [-Clean]
+﻿# DodgeGame 빌드 (CMake + VS 2022 Build Tools, MSVC v141).
+#   tools\build.ps1 -Config Debug|Release [-Arch Win32|x64] [-Clean]
+#   Win32: DodgeGame\build      x64: DodgeGame\build-x64
 # 이 파일은 UTF-8 BOM으로 저장해야 한다(Windows PowerShell 5.1이 한글 주석을 ANSI로 읽는 문제 방지).
 param(
     [ValidateSet('Debug', 'Release')][string]$Config = 'Debug',
+    [ValidateSet('Win32', 'x64')][string]$Arch = 'Win32',
     [switch]$Clean
 )
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = Split-Path $PSScriptRoot -Parent
 $Src      = Join-Path $RepoRoot 'DodgeGame'
-$BuildDir = Join-Path $Src 'build'
+$BuildDir = Join-Path $Src $(if ($Arch -eq 'x64') { 'build-x64' } else { 'build' })
 
 if (-not (Test-Path (Join-Path $Src 'cocos2d\CMakeLists.txt'))) {
     throw 'engine not found. Run tools\setup_engine.ps1 first.'
@@ -30,7 +32,12 @@ if ($Clean -and (Test-Path $BuildDir)) { Remove-Item $BuildDir -Recurse -Force }
 # configure가 중간에 실패하면 CMakeCache.txt만 남으므로 생성된 솔루션 유무로 판단한다.
 if (-not (Test-Path (Join-Path $BuildDir 'ALL_BUILD.vcxproj'))) {
     if (Test-Path $BuildDir) { Remove-Item $BuildDir -Recurse -Force }
-    & $cmake -S $Src -B $BuildDir -G 'Visual Studio 17 2022' -A Win32 -T v141
+    $cfgArgs = @('-S', $Src, '-B', $BuildDir, '-G', 'Visual Studio 17 2022', '-A', $Arch, '-T', 'v141')
+    if ($Arch -eq 'x64') {
+        # x64용 curl/openssl/libwebsockets/libuv/Box2D/Bullet 빌드는 없다(docs/05-x64-migration.md).
+        $cfgArgs += @('-DCOCOS_USE_NETWORK=OFF', '-DCOCOS_USE_BULLET_BOX2D=OFF')
+    }
+    & $cmake @cfgArgs
     if ($LASTEXITCODE -ne 0) { throw "cmake configure failed ($LASTEXITCODE)" }
 }
 
