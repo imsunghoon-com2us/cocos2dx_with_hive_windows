@@ -47,6 +47,7 @@ cocos2dx_with_hive_windows/
 | 7 | 엔진 패치의 x86 분기 정리(x64 전용, `COCOS_USE_*` 기본 OFF). 브랜치 `phase7/engine-patch-cleanup` | `tools/patches/engine-3.17.2-x64/`, `docs/05-x64-migration.md`의 "Phase 7" 절 | 새 패치가 원본에 적용돼 편집본과 바이트 일치, 플래그 없는 새 configure로 같은 구성, x64 빌드·시험·SDK 실행 |
 | 8 | Hive 로그인과 AppId. 브랜치 `phase8/hive-login` | `docs/08-hive-login.md`, `HiveCocos`의 `signIn`/`showSignIn`/`signOut`, `setup_hive.ps1 -AppId`, `hive.local.json` | 단위 시험, `L` 키로 로그인 UI 표시, **사용자 확인: 실제 로그인/로그아웃/자동 로그인** |
 | 9 | 다운로드 소스 SHA256 고정(19개) + Hive SDK 고정 버전 다운로드. 브랜치 `phase9/sha256-pinning` | `docs/10-sha256-pinning.md`, `tools/hive_sdk.json`, `tools/fetch_hive.ps1`, `build_deps_x64.ps1`/`setup_engine.ps1`/`setup_hive.ps1` 수정 | 정상 통과, 변조 시 명확한 오류로 중단(부정·변이 시험), 단위 시험 회귀 없음 |
+| 10 | 타이틀 화면, 초기화 후 자동/명시적 로그인, 설정 메뉴(로그아웃, 계정 삭제), 실패 팝업과 재시도. 브랜치 `phase10/title-login-settings` | `docs/11-title-login-settings.md`, `TitleScene`, `SettingsMenu`, `ModalDialog`, `HiveService` 개편, `HiveAuthV4::playerDelete`/`isAutoSignIn` | 단위 시험 146개, SDK 없는 환경과 로그인 취소로 재시도 정책 확인, **사용자 확인: 로그인 후 시작/로그아웃/계정 삭제, IME** |
 
 Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작이 확인된 뒤에만 `main`에 `--no-ff`로 병합한다.
 
@@ -62,7 +63,9 @@ Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작
 - [x] Phase 6: Hive SDK 연동 — 초기화 + 설정 (브랜치 `phase6/hive-sdk-init`). 실제 SDK로 `setup` 응답 확인(HUD `Hive 4.26.7.0: ready (providers 9)`). x86 지원 제거(x64 전용). `main` 병합 완료
 - [x] Phase 7: 엔진 패치 x86 분기 정리 (브랜치 `phase7/engine-patch-cleanup`, `main` 병합 완료)
 - [x] Phase 8: Hive 로그인과 AppId (브랜치 `phase8/hive-login`, `main` 병합 완료). 구현·단위 시험(119개)·로그인 UI 표시 확인, `real` 존 약관 동의 후 **사용자가 로그인 동작 확인**. 로그아웃/자동 로그인/한글 입력(IME)은 확인 결과 미전달(`docs/08` 참고)
-- [x] Phase 9: 다운로드 소스 SHA256 고정 + Hive SDK 고정 다운로드 (브랜치 `phase9/sha256-pinning`, 구현·시험 완료, `main` 병합은 사용자 확인 대기). 라이브러리 15개, 엔진, 서브모듈 2개, 외부 번들을 SHA256으로 고정하고,
+- [x] Phase 9: 다운로드 소스 SHA256 고정 + Hive SDK 고정 다운로드 (브랜치 `phase9/sha256-pinning`, `main` 병합 완료 `5dee067`). 라이브러리 15개, 엔진, 서브모듈 2개, 외부 번들을 SHA256으로 고정하고,
   Hive SDK는 `tools/hive_sdk.json` 고정 버전을 `tools/fetch_hive.ps1`로 받는다(최신은 확인만, 갱신은 `-Update`). 자세한 내용과 시험은 `docs/10-sha256-pinning.md`
+- [ ] Phase 10: 타이틀 화면 + 자동/명시적 로그인 + 설정 메뉴(로그아웃/계정 삭제) (브랜치 `phase10/title-login-settings`). 구현, 단위 시험 146개, SDK 없는 환경과 로그인 취소로 재시도 정책 확인까지 완료.
+  **사람 확인 대기**: 로그인 후 시작/로그아웃/자동 로그인, 계정 삭제(1회용 계정), 게스트 판별(`providerInfoData` 실제 모양), 한글 입력(IME). `main` 병합은 확인 후(`docs/11-title-login-settings.md`)
 
 Phase 5부터 빌드는 x64 전용이다. `docs/01~04`는 Win32 시절의 기록이므로 해당 명령(`-Arch` 없이 Win32 빌드 등)은 더 이상 유효하지 않다. 현재 규칙은 `CLAUDE.md`를 따른다.

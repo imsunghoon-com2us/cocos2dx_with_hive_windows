@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <vector>
 
+class SettingsMenu;
+
 // 떨어지는 물체 피하기. 한 판이 곧 한 씬이며, 재시작은 새 씬으로 교체한다.
 class GameScene : public cocos2d::Layer
 {
@@ -56,10 +58,7 @@ private:
     cocos2d::DrawNode* _player = nullptr;
     cocos2d::Label* _scoreLabel = nullptr;
     cocos2d::Label* _bestLabel = nullptr;
-    cocos2d::Label* _hiveLabel = nullptr;     // Hive SDK 상태 한 줄 (Windows 빌드에서만 사용)
-    std::string _hiveStatusShown;
-    cocos2d::Label* _loginLabel = nullptr;    // Hive 로그인 상태 한 줄 (Windows 빌드에서만 사용)
-    std::string _loginStatusShown;
+    SettingsMenu* _settings = nullptr;        // 우측 상단 설정 버튼 (Windows 빌드에서만 사용)
     cocos2d::Node* _gameOverPanel = nullptr;
     std::vector<Obstacle> _obstacles;
 

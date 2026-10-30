@@ -26,6 +26,7 @@
 #include "GameScene.h"
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
 #include "HiveService.h"
+#include "TitleScene.h"
 #endif
 
 // #define USE_AUDIO_ENGINE 1
@@ -126,14 +127,15 @@ bool AppDelegate::applicationDidFinishLaunching() {
     register_all_packages();
 
     // create a scene. it's an autorelease object
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+    // The title screen starts the Hive SDK (HiveService::start) and signs in before the game can be started.
+    auto scene = TitleScene::createScene(true);
+#else
     auto scene = GameScene::createScene();
+#endif
 
     // run
     director->runWithScene(scene);
-
-#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
-    HiveService::instance().start();
-#endif
 
     return true;
 }

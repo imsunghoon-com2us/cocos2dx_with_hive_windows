@@ -55,6 +55,13 @@ public:
 
     void signOut(SignOutCallback callback);
 
+    // Deletes the account on the server and removes the local session (irreversible). Same reply shape as signOut.
+    void playerDelete(SignOutCallback callback);
+
+    // Synchronous. Whether signIn("AUTO") is possible (same value as SetupResult::isAutoSignIn; use it again after
+    // a sign-out, when setup is not run again). False when the bridge is not started or does not answer.
+    bool isAutoSignIn();
+
     // Synchronous. Call before the process exits.
     bool terminateProcess();
 

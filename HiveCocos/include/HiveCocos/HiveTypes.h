@@ -59,6 +59,14 @@ struct HivePlayerInfo
     std::string accessToken;    // secret: never log it
     bool isNewUser = false;
 
+    // Names of the connected providers ("providerInfoData" / "customProviderInfoData" keys). Names only: the
+    // provider user ids and e-mails in those objects are deliberately not read.
+    std::vector<std::string> connectedProviders;
+    bool providerInfoKnown = false;     // false when the reply carried neither object (cannot tell)
+
+    // A guest has no connected provider. The SDK cannot sign a guest back in after signOut.
+    bool isGuest() const { return providerInfoKnown && connectedProviders.empty(); }
+
     // Safe to log: no tokens.
     std::string toString() const;
 };

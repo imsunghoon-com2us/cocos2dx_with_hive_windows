@@ -9,7 +9,11 @@ std::string HivePlayerInfo::toString() const
     // Tokens are deliberately left out so this is always safe to log.
     std::ostringstream os;
     os << "PlayerInfo { playerId=" << playerId << ", playerName=" << playerName
-       << ", isNewUser=" << (isNewUser ? "true" : "false") << " }";
+       << ", isNewUser=" << (isNewUser ? "true" : "false") << ", providers=";
+    if (!providerInfoKnown) os << "unknown";
+    else if (connectedProviders.empty()) os << "none(guest)";
+    else for (size_t i = 0; i < connectedProviders.size(); ++i) os << (i ? "," : "") << connectedProviders[i];
+    os << " }";
     return os.str();
 }
 
@@ -39,6 +43,18 @@ HivePlayerInfo parsePlayerInfo(const HiveResponse& reply)
     p.accessToken = memberString(o, "accessToken");
     auto nu = o.FindMember("isNewUser");
     p.isNewUser = nu != o.MemberEnd() && nu->value.IsBool() && nu->value.GetBool();
+
+    // Provider names only (the object values hold user ids / e-mails and are not read).
+    for (const char* key : { "providerInfoData", "customProviderInfoData" })
+    {
+        auto pi = o.FindMember(key);
+        if (pi == o.MemberEnd() || !pi->value.IsObject()) continue;
+        p.providerInfoKnown = true;
+        for (auto m = pi->value.MemberBegin(); m != pi->value.MemberEnd(); ++m)
+        {
+            p.connectedProviders.emplace_back(m->name.GetString(), m->name.GetStringLength());
+        }
+    }
     return p;
 }
 
@@ -115,6 +131,20 @@ void HiveAuthV4::signOut(SignOutCallback callback)
         if (callback) callback(parseSignOutReply(reply));
     });
     if (!sent && callback) callback(SignOutResult());
+}
+
+void HiveAuthV4::playerDelete(SignOutCallback callback)
+{
+    const bool sent = _bridge.callAsync("AuthV4", "playerDelete", HiveParams(), [callback](const HiveResponse& reply) {
+        if (callback) callback(parseSignOutReply(reply));
+    });
+    if (!sent && callback) callback(SignOutResult());
+}
+
+bool HiveAuthV4::isAutoSignIn()
+{
+    const HiveResponse reply = _bridge.callSync("AuthV4", "isAutoSignIn");
+    return reply.ok && reply.getBool("isAutoSignIn");
 }
 
 bool HiveAuthV4::terminateProcess()
