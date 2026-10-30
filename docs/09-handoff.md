@@ -1,6 +1,10 @@
-# 09. 인계 문서 (2026-10-30) - 다음 작업: 다운로드 소스 SHA256 고정
+# 09. 인계 문서 (2026-10-30) - 다운로드 소스 SHA256 고정 (구현 완료, 아래는 작성 당시 계획)
 
-새 세션에서는 이 문서와 `CLAUDE.md`를 먼저 읽고 "SHA256 고정 작업부터 이어서 진행해줘"라고 하면 된다.
+> **갱신(2026-10-30)**: 아래 5절의 계획은 `phase9/sha256-pinning` 브랜치에서 구현을 마쳤다. 실제 결과와 시험은 `docs/10-sha256-pinning.md`를 본다.
+> 계획과 달라진 점: ① **Hive SDK도 포함**(사용자 요청): 항상 최신이 아니라 `tools/hive_sdk.json`의 고정 버전·해시로 `tools/fetch_hive.ps1`이 받고, 최신 확인은 `-CheckLatest`, 갱신은 `-Update`.
+> ② 외부 번들은 `download-deps.py`를 고치지 않고, 스크립트가 받아 검증한 zip을 엔진 루트에 두는 방식으로 검증한다. 남은 일: `main` 병합(사용자 확인 후), 6절의 나머지 작업.
+
+새 세션에서는 이 문서와 `CLAUDE.md`를 먼저 읽는다. (이전 안내: "SHA256 고정 작업부터 이어서 진행해줘")
 (같은 내용의 작업 메모가 `C:\Users\COM2US\.claude\plans\bubbly-frolicking-seal.md`에도 있지만 저장소 밖이라 자동으로 읽히지 않는다.)
 
 ## 1. 한 줄 요약
@@ -57,7 +61,7 @@ GitHub private 저장소 `imsunghoon-com2us/cocos2dx_with_hive_windows`. 문서�
 - `setup_engine.ps1` 2개: cocos2d-x 3.17.2 태그 zip(`$EngineUrl`), 외부 번들 `v3-deps-158`(`download-deps.py`가 받으며 파일 크기를 진행률용으로만 쓰고 해시 검증 없음. 번들의 헤더와 소스는 게임에 컴파일된다).
 - `cocos2d-console`, `bindings-generator`: URL에 전체 커밋 해시가 있어 내용은 이미 고정이다.
 - CMake/Python/VS Build Tools는 winget이 자체 해시로 검증한다.
-- **Hive SDK는 대상이 아니다**: 스크립트가 내려받지 않고, 업데이트가 정상 사용이라 고정하면 갱신 때마다 막힌다. 선택 사항으로 **버전 추적**만 한다:
+- (계획 당시 판단, **이후 변경됨**: 위 갱신 참고) **Hive SDK는 대상이 아니다**: 스크립트가 내려받지 않고, 업데이트가 정상 사용이라 고정하면 갱신 때마다 막힌다. 선택 사항으로 **버전 추적**만 한다:
   `setup_hive.ps1`이 패키지 `version.json`(현재 `26.7.0`)을 출력하고 시험한 버전과 다르면 경고(실패 아님). 런타임 `getHiveSDKVersion`은 `4.26.7.0`으로 표기가 다르다.
 
 ### 해시의 기준점(캐시)

@@ -70,6 +70,49 @@
 시험 중 알게 된 점: 비트 하나를 뒤집은 zip은 `tar`의 CRC 검사에서 먼저 실패하므로 그것만으로는 SHA256 검증의 효과를 가릴 수 없다.
 그래서 변이 시험은 유효한 zip으로 했다. 콜드 15개 재빌드(약 25분)는 하지 않았다.
 
+## Hive SDK: 고정 버전 + 명시적 갱신
+사용자 요청으로 SDK도 공식 링크에서 자동으로 받게 했다. 다만 "항상 최신"이 아니라 **고정 버전과 해시로 받고, 최신 버전은 확인해서 알리기만 한다**.
+매 빌드마다 최신을 받으면 재현이 안 되고, SDK가 바뀌어 빌드나 동작이 깨져도 원인을 못 찾기 때문이다(약관 화면이 다시 뜨는 등 동작 변화도 관찰된 적이 있다).
+
+- 릴리스 페이지: `https://developers.hiveplatform.ai/ko/latest/releases/unreal5/`. 직접 zip 링크가 원본 HTML에 있고, 로그인 없이 받을 수 있다(HEAD와 실제 다운로드로 확인). **페이지에 체크섬은 없다.**
+- 매니페스트 `tools/hive_sdk.json`(커밋됨): 버전, URL, SHA256, 크기, 설치 폴더 이름. URL은 공개 페이지의 값이며 키가 아니다.
+
+| 패키지 | URL | 크기 | SHA256 |
+|---|---|---|---|
+| Windows UE5 26.7.0 | `.../crossplay/unreal/Hive%20SDK%20v4%20Windows%20UnrealEngine5%2026.7.0.zip?t=1` | 592,480,974 | `80F5106462E1C4640A028B1A67FBBB5644A716C07AD89029FE46DA16AA0179D0` |
+| UE5 Interface 26.7.0 | `.../hive_sdk_v4_with_core/unreal/Hive_SDK_v4_UE5_Interface_26.7.0.zip` | 8,023,475 | `69D96581E1C4F9E3EBBC049BFD1125423DCF813B19F31E56ADDB89E87E69C402` |
+
+- 기준점: 위 해시는 2026-10-30에 받은 zip의 값이다. 그 zip을 풀어 **지금까지 시험에 쓴 로컬 폴더와 비교**했다(Windows: 2,609개 파일 목록·크기·SHA256 모두 일치.
+  Interface: 490개 일치, 로컬에는 iOS `Hercules.swiftmodule` 파일 10개가 없었고 빌드와 무관). 같은 날 같은 URL을 세 번 받았을 때 해시가 같았다.
+- Windows 26.7.0 zip의 `Last-Modified`(2026-09-28)는 같은 버전의 다른 패키지(2026-09-04)보다 늦고 URL에 `?t=1`이 붙어 있다. **같은 버전 번호로 다시 올렸을 가능성이 있다**
+  (정황일 뿐 확인하지는 못했다). 해시를 고정하는 이유 중 하나다.
+- **Windows 패키지만 빌드에 필요하다**(`setup_hive.ps1`이 `HiveSDKWindows\assets`를 복사). Interface 패키지는 API 참고용 UE C++ 소스라 `-IncludeInterface`일 때만 받는다.
+
+### 명령 (`tools/fetch_hive.ps1`, `tools/setup_hive.ps1`)
+- `fetch_hive.ps1`: 고정 버전을 `HiveSDKv4_unreal\<폴더>`에 설치한다. 폴더 안 `.fetched` 표식(검증한 zip의 해시)이 매니페스트와 같으면 건너뛴다.
+  받은 zip은 SHA256을 검증한 뒤에만 `<폴더>.tmp`에 풀고 교체하며, 불일치하면 zip을 지우고 아무것도 설치하지 않은 채 중단한다. 우회 옵션은 없다.
+- `fetch_hive.ps1 -CheckLatest`: 릴리스 페이지의 최신 Windows 버전을 보고만 한다(파일은 건드리지 않는다). 페이지를 못 읽으면 경고만 한다(오류 아님).
+- `fetch_hive.ps1 -Update [-Version x.y.z]`: 핀을 바꾸는 **유일한** 명령. 새 버전을 받아 해시를 계산하고(최초 신뢰), 풀고, `hive_sdk.json`을 다시 쓴다.
+  같은 버전인데 해시가 달라지면 "재업로드" 경고를 낸다. 이전 버전 폴더는 지우지 않는다(약 0.6GB씩).
+- `setup_hive.ps1`: `-HiveRoot`를 지정하지 않으면 매니페스트 버전 폴더만 본다(폴더가 없으면 `fetch_hive.ps1`을 자동 실행). 이전에는 `HiveRoot` 아래 첫 `assets`를 골라
+  버전 폴더가 여러 개면 모호했다. 패키지 `version.json`을 출력하고 핀과 다르면 경고한다. `-HiveRoot`를 지정하면 이전 동작(그 아래 첫 `assets`)이다.
+- 갱신 절차: `-CheckLatest` -> `-Update` -> `git diff tools/hive_sdk.json` 검토 -> `setup_hive.ps1`, 빌드, `HiveCocosTests`, 실제 SDK 실행(약관 화면이 다시 뜰 수 있다) -> 매니페스트 커밋.
+
+### 시험 (2026-10-30, 실제 `HiveSDKv4_unreal`은 건드리지 않고 임시 폴더 사용)
+| 시험 | 결과 |
+|---|---|
+| `-CheckLatest` | `pinned 26.7.0 / latest 26.7.0` |
+| 콜드 설치(Windows + Interface), 재실행 | 검증 후 설치(43초), 설치 트리가 로컬 폴더와 파일 수·바이트 합 일치(2,609개), 재실행은 건너뜀, 캐시에 zip 남지 않음 |
+| 부정: 매니페스트 해시 첫 글자를 바꿈 | `SHA256 mismatch`로 중단, 설치 없음, zip 삭제 |
+| `-Update`(최신 = 현재 버전) | 해시가 같고 생성한 매니페스트가 원본과 **바이트 동일** |
+| `-Update -Version 26.4.2` | 해당 버전의 해시, 크기, 폴더가 든 매니페스트 생성, 페이지에 Interface 링크가 없어 `interface: null` + 경고 |
+| `setup_hive.ps1` 자동 설치(폴더 없음 -> `fetch_hive.ps1` -> assets 복사 -> x64 DLL 검사) | 통과 |
+| 실제 저장소에서 `setup_hive.ps1 -Config Release` | 고정 버전 폴더를 사용, `SDK version: 26.7.0`, 설정(AppId, zone) 적용, `HIVE_PLUGIN_CPP.dll` x64 확인 |
+
+- 이 PC의 기존 로컬 폴더에는 `.fetched` 표식이 없었다. 위 파일 단위 해시 비교로 고정된 zip과 같음을 확인했으므로 표식만 직접 만들었다(폴더는 교체하지 않았다).
+  표식이 없는 폴더를 쓰면 `setup_hive.ps1`이 경고한다(`fetch_hive.ps1 -Force`로 다시 설치·검증).
+- 이번에는 Release 게임 창을 띄워 `ready`를 다시 확인하지는 않았다. 게임·어댑터 코드는 바뀌지 않았고(`HiveCocosTests` 119개 통과), 복사되는 런타임 파일의 출처는 해시가 같은 26.7.0이다.
+
 ## 해시 갱신 절차 (버전을 올릴 때)
 1. 새 URL과 버전으로 파일을 받는다(스크립트는 해시가 틀리면 받은 파일을 지우므로, 수동으로 받아 `Get-FileHash -Algorithm SHA256`로 계산한다).
 2. 가능하면 업스트림 서명/체크섬과 교차 확인한다(위 표의 mpg123 방식). 못 하면 "최초 신뢰"임을 이 문서에 적는다.

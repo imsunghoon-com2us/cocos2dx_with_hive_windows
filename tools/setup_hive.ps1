@@ -1,6 +1,9 @@
 ﻿# Copies the Hive SDK (Windows, x64) runtime next to DodgeGame.exe. Safe to re-run: only changed files are copied.
 #   tools\setup_hive.ps1 [-Config Debug|Release] [-HiveRoot <dir>] [-Target <dir>] [-AppId <id>] [-Zone real|test|sandbox]
 #
+# SDK package: by default the version pinned in tools\hive_sdk.json under HiveSDKv4_unreal\ (fetched and SHA256-verified by
+#   tools\fetch_hive.ps1 when missing). -HiveRoot <dir> uses your own package folder instead.
+#
 # AppId: written into <exe dir>\Resources\hive_config.xml after the copy (the SDK package itself is never modified).
 #   Resolution order: -AppId, env HIVE_APP_ID, "appId" in <repo>\hive.local.json (git-ignored). If none is set the SDK
 #   sample value is kept. Every run re-copies the sample config first, so the value is applied again each time.
@@ -42,9 +45,26 @@ if ($Zone) {
     if ($Zone -notin @('real', 'test', 'sandbox')) { throw "invalid Zone '$Zone' (allowed: real, test, sandbox)" }
 }
 
-if (-not (Test-Path $HiveRoot)) { throw "Hive SDK package not found: $HiveRoot (use -HiveRoot)" }
+# Default package: the version pinned in tools\hive_sdk.json (installed and SHA256-verified by tools\fetch_hive.ps1, which is run
+# here when that folder is missing). An explicit -HiveRoot keeps the old behavior: the first HiveSDKWindows\assets found under it.
+$pinned = $null
+$manifestPath = Join-Path $PSScriptRoot 'hive_sdk.json'
+if (-not $PSBoundParameters.ContainsKey('HiveRoot') -and (Test-Path $manifestPath)) {
+    $pinned = Get-Content $manifestPath -Raw | ConvertFrom-Json
+    $pinnedDir = Join-Path $HiveRoot $pinned.windows.folder
+    if (-not (Test-Path $pinnedDir)) {
+        Write-Host "Pinned Hive SDK $($pinned.version) is not installed; running tools\fetch_hive.ps1"
+        & (Join-Path $PSScriptRoot 'fetch_hive.ps1') -HiveRoot $HiveRoot
+        if (-not (Test-Path $pinnedDir)) { throw "fetch_hive.ps1 did not create $pinnedDir" }
+    }
+    if (-not (Test-Path (Join-Path $pinnedDir '.fetched'))) {
+        Write-Warning "$pinnedDir has no .fetched marker: its contents were not installed by fetch_hive.ps1 (run tools\fetch_hive.ps1 -Force to reinstall and verify)"
+    }
+    $HiveRoot = $pinnedDir
+}
+if (-not (Test-Path $HiveRoot)) { throw "Hive SDK package not found: $HiveRoot (use -HiveRoot, or run tools\fetch_hive.ps1)" }
 if (-not (Test-Path (Join-Path $Target 'DodgeGame.exe'))) {
-    throw "DodgeGame.exe not found in $Target. Build first: tools\build.ps1 -Config $Config -Arch x64"
+    throw "DodgeGame.exe not found in $Target. Build first: tools\build.ps1 -Config $Config"
 }
 
 # Find ...\HiveSDKWindows\assets (prefer the plugin copy over the sample project's identical copy).
@@ -55,6 +75,13 @@ $assets = Get-ChildItem $HiveRoot -Recurse -Directory -Filter 'assets' -ErrorAct
 if (-not $assets) { throw "HiveSDKWindows\assets\additional not found under $HiveRoot" }
 $assets = $assets.FullName
 Write-Host "SDK assets : $assets"
+# Package version (HiveSDKWindows\version.json). Differing from the pinned version only warns.
+$pkgVersionFile = Join-Path (Split-Path $assets -Parent) 'version.json'
+if (Test-Path $pkgVersionFile) {
+    $pkgVersion = [string](Get-Content $pkgVersionFile -Raw | ConvertFrom-Json).version
+    Write-Host "SDK version: $pkgVersion"
+    if ($pinned -and $pkgVersion -ne $pinned.version) { Write-Warning "package version $pkgVersion differs from the pinned $($pinned.version) in tools\hive_sdk.json" }
+}
 Write-Host "Target     : $Target"
 
 function Sync-Dir($from, $to, $extraArgs) {
