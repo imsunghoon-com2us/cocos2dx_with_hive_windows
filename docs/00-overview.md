@@ -65,7 +65,7 @@ Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작
 - [x] Phase 8: Hive 로그인과 AppId (브랜치 `phase8/hive-login`, `main` 병합 완료). 구현·단위 시험(119개)·로그인 UI 표시 확인, `real` 존 약관 동의 후 **사용자가 로그인 동작 확인**. 로그아웃/자동 로그인/한글 입력(IME)은 확인 결과 미전달(`docs/08` 참고)
 - [x] Phase 9: 다운로드 소스 SHA256 고정 + Hive SDK 고정 다운로드 (브랜치 `phase9/sha256-pinning`, `main` 병합 완료 `5dee067`). 라이브러리 15개, 엔진, 서브모듈 2개, 외부 번들을 SHA256으로 고정하고,
   Hive SDK는 `tools/hive_sdk.json` 고정 버전을 `tools/fetch_hive.ps1`로 받는다(최신은 확인만, 갱신은 `-Update`). 자세한 내용과 시험은 `docs/10-sha256-pinning.md`
-- [ ] Phase 10: 타이틀 화면 + 자동/명시적 로그인 + 설정 메뉴(로그아웃/계정 삭제) (브랜치 `phase10/title-login-settings`). 구현, 단위 시험 146개, SDK 없는 환경과 로그인 취소로 재시도 정책 확인까지 완료.
-  **사람 확인 대기**: 로그인 후 시작/로그아웃/자동 로그인, 계정 삭제(1회용 계정), 게스트 판별(`providerInfoData` 실제 모양), 한글 입력(IME). `main` 병합은 확인 후(`docs/11-title-login-settings.md`)
+- [x] Phase 10: 타이틀 화면 + 자동/명시적 로그인 + 설정 메뉴(로그아웃/계정 삭제) (브랜치 `phase10/title-login-settings`, `main` 병합 완료). 구현, 단위 시험 146개, SDK 없는 환경과 로그인 취소로 재시도 정책, 종료 시 CEF 프로세스 정리 확인까지 완료. 약관은 정상 노출 확인(`propFolder\REAL_HiveProperty.dat` 삭제로 재시험 가능).
+  **미확인(사람 확인이 필요했고 결과를 전달받지 못함)**: 로그인 후 시작/로그아웃/자동 로그인, 계정 삭제(1회용 계정), 게스트 판별(`providerInfoData` 실제 모양), 한글 입력(IME) (`docs/11-title-login-settings.md`)
 
 Phase 5부터 빌드는 x64 전용이다. `docs/01~04`는 Win32 시절의 기록이므로 해당 명령(`-Arch` 없이 Win32 빌드 등)은 더 이상 유효하지 않다. 현재 규칙은 `CLAUDE.md`를 따른다.

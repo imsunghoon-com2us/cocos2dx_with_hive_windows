@@ -59,5 +59,5 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 - 문서와 대화는 한국어로 쓴다.
 
 ## 인계 (새 세션은 먼저 읽을 것)
-- 현재 상태, 이 PC의 함정, 남은 작업은 `docs/09-handoff.md`에 정리돼 있다. Phase 9(다운로드 소스 SHA256 고정 + Hive SDK 고정 다운로드)는 브랜치 `phase9/sha256-pinning`에서 구현을 마쳤고 `main` 병합 확인을 기다린다(`docs/10-sha256-pinning.md`).
+- 현재 상태, 이 PC의 함정, 남은 작업은 `docs/09-handoff.md`에 정리돼 있다. Phase 9(다운로드 소스 SHA256 고정 + Hive SDK 고정 다운로드, `docs/10-sha256-pinning.md`)와 Phase 10(타이틀/로그인/설정 메뉴, `docs/11-title-login-settings.md`)까지 `main`에 병합돼 있다.
 - 미확인 항목(로그아웃, 자동 로그인, 한글 입력 IME, `<market>` 조합)은 확인된 것처럼 말하지 말고 미확인으로 다룬다.
