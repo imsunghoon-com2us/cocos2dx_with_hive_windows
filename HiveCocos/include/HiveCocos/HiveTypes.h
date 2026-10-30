@@ -48,6 +48,21 @@ struct HiveResultAPI
     std::string toString() const;
 };
 
+// Mirrors the "playerInfo" object of sign-in replies.
+struct HivePlayerInfo
+{
+    int64_t playerId = 0;
+    std::string playerName;
+    std::string playerImageUrl;
+    std::string did;
+    std::string playerToken;    // secret: never log it (toString() leaves it out)
+    std::string accessToken;    // secret: never log it
+    bool isNewUser = false;
+
+    // Safe to log: no tokens.
+    std::string toString() const;
+};
+
 enum class HiveZone { Real, Sandbox };
 
 } // namespace hivecocos

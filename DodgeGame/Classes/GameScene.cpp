@@ -88,6 +88,12 @@ void GameScene::setupHud()
     _hiveLabel->setPosition(Vec2(origin.x + 12.0f, origin.y + visible.height - 40.0f));
     _hiveLabel->setTextColor(Color4B(160, 170, 190, 255));
     addChild(_hiveLabel, 10);
+
+    _loginLabel = Label::createWithTTF("", kFont, 14);
+    _loginLabel->setAnchorPoint(Vec2(0.0f, 1.0f));
+    _loginLabel->setPosition(Vec2(origin.x + 12.0f, origin.y + visible.height - 58.0f));
+    _loginLabel->setTextColor(Color4B(120, 200, 150, 255));
+    addChild(_loginLabel, 10);
 #endif
 }
 
@@ -95,8 +101,23 @@ void GameScene::setupInput()
 {
     auto keyboard = EventListenerKeyboard::create();
     keyboard->onKeyPressed = [this](EventKeyboard::KeyCode code, Event*) {
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+        // Hive 로그인 UI가 떠 있는 동안에는 게임 키 입력(ESC 포함)을 무시한다. UI에 입력한 글자나 닫기용 ESC가 게임에 전달되지 않게 한다.
+        if (HiveService::instance().isLoginPending())
+        {
+            return;
+        }
+#endif
         switch (code)
         {
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+        case EventKeyboard::KeyCode::KEY_L:
+            HiveService::instance().requestSignIn();
+            break;
+        case EventKeyboard::KeyCode::KEY_O:
+            HiveService::instance().requestSignOut();
+            break;
+#endif
         case EventKeyboard::KeyCode::KEY_LEFT_ARROW:
         case EventKeyboard::KeyCode::KEY_A:
             _leftDown = true;
@@ -165,6 +186,11 @@ void GameScene::update(float dt)
     {
         _hiveStatusShown = HiveService::instance().status();
         _hiveLabel->setString(_hiveStatusShown);
+    }
+    if (_loginLabel && _loginStatusShown != HiveService::instance().loginStatus())
+    {
+        _loginStatusShown = HiveService::instance().loginStatus();
+        _loginLabel->setString(_loginStatusShown);
     }
 #endif
 

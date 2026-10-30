@@ -30,3 +30,6 @@ HiveSDKv4_unreal/
 
 # x64 build output
 DodgeGame/build-x64/
+
+# Local Hive settings (AppId etc.), read by tools/setup_hive.ps1
+hive.local.json

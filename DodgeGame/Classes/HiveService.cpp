@@ -2,7 +2,6 @@
 
 #include "HiveCocos/CocosDispatcher.h"
 #include "HiveCocos/DllTransport.h"
-#include "HiveCocos/HiveAuthV4.h"
 #include "HiveCocos/HiveBridge.h"
 #include "HiveCocos/HiveConfiguration.h"
 
@@ -35,6 +34,12 @@ HiveService& HiveService::instance()
 void HiveService::setStatus(const std::string& status)
 {
     _status = status;
+    log("[Hive] %s", status.c_str());
+}
+
+void HiveService::setLoginStatus(const std::string& status)
+{
+    _loginStatus = status;
     log("[Hive] %s", status.c_str());
 }
 
@@ -78,15 +83,87 @@ void HiveService::start()
         if (!result.delivered)
         {
             setStatus("Hive " + version + ": setup request failed");
+            return;
         }
-        else if (result.result.isSuccess())
-        {
-            setStatus("Hive " + version + ": ready (providers " + std::to_string(result.providerTypeList.size()) + ")");
-        }
-        else
+        if (!result.result.isSuccess())
         {
             log("[Hive] setup failed: %s", result.result.toString().c_str());
             setStatus("Hive " + version + ": setup failed (code " + std::to_string(result.result.code) + ")");
+            return;
+        }
+
+        _setupReady = true;
+        setStatus("Hive " + version + ": ready (providers " + std::to_string(result.providerTypeList.size()) + ")");
+
+        if (result.isAutoSignIn)
+        {
+            // A stored session exists: sign in with it without showing any UI.
+            beginLogin("Login: auto sign-in...");
+            HiveAuthV4(*_bridge).signIn("AUTO", [this](const HiveAuthV4::SignInResult& r) { onSignInResult(r, true); });
+        }
+        else
+        {
+            setLoginStatus("Login: press L to sign in");
+        }
+    });
+}
+
+void HiveService::beginLogin(const std::string& pendingText)
+{
+    _loginPending = true;
+    setLoginStatus(pendingText);
+}
+
+void HiveService::onSignInResult(const HiveAuthV4::SignInResult& result, bool autoAttempt)
+{
+    _loginPending = false;
+
+    if (!result.delivered)
+    {
+        setLoginStatus("Login: request failed");
+        return;
+    }
+    // Never log tokens: HivePlayerInfo::toString() leaves them out.
+    log("[Hive] sign-in reply: %s | %s", result.result.toString().c_str(), result.playerInfo.toString().c_str());
+
+    if (result.result.isSuccess())
+    {
+        _signedIn = true;
+        setLoginStatus("Login: signed in (player " + std::to_string(result.playerInfo.playerId) +
+                       (result.playerInfo.isNewUser ? ", new user" : "") + ") - O: sign out");
+    }
+    else
+    {
+        _signedIn = false;
+        setLoginStatus(std::string("Login: ") + (autoAttempt ? "auto sign-in failed" : "failed") +
+                       " (code " + std::to_string(result.result.code) + ") - press L to sign in");
+    }
+}
+
+void HiveService::requestSignIn()
+{
+    if (!_bridge || !_setupReady || _loginPending || _signedIn) return;
+
+    beginLogin("Login: Hive sign-in UI...");
+    HiveAuthV4(*_bridge).showSignIn([this](const HiveAuthV4::SignInResult& r) { onSignInResult(r, false); });
+}
+
+void HiveService::requestSignOut()
+{
+    if (!_bridge || !_setupReady || _loginPending || !_signedIn) return;
+
+    beginLogin("Login: signing out...");
+    HiveAuthV4(*_bridge).signOut([this](const HiveAuthV4::SignOutResult& r) {
+        _loginPending = false;
+        if (r.delivered && r.result.isSuccess())
+        {
+            _signedIn = false;
+            setLoginStatus("Login: signed out - press L to sign in");
+        }
+        else
+        {
+            log("[Hive] sign-out reply: %s", r.result.toString().c_str());
+            setLoginStatus("Login: sign-out failed (code " + std::to_string(r.result.code) + ")");
         }
     });
 }

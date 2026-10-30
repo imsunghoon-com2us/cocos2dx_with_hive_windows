@@ -1,6 +1,48 @@
 #include "HiveCocos/HiveAuthV4.h"
 
+#include <sstream>
+
 namespace hivecocos {
+
+std::string HivePlayerInfo::toString() const
+{
+    // Tokens are deliberately left out so this is always safe to log.
+    std::ostringstream os;
+    os << "PlayerInfo { playerId=" << playerId << ", playerName=" << playerName
+       << ", isNewUser=" << (isNewUser ? "true" : "false") << " }";
+    return os.str();
+}
+
+namespace {
+
+std::string memberString(const rapidjson::Value& obj, const char* key)
+{
+    auto it = obj.FindMember(key);
+    return (it != obj.MemberEnd() && it->value.IsString()) ? std::string(it->value.GetString(), it->value.GetStringLength())
+                                                          : std::string();
+}
+
+HivePlayerInfo parsePlayerInfo(const HiveResponse& reply)
+{
+    HivePlayerInfo p;
+    if (!reply.doc) return p;
+    auto it = reply.doc->FindMember("playerInfo");
+    if (it == reply.doc->MemberEnd() || !it->value.IsObject()) return p;
+
+    const rapidjson::Value& o = it->value;
+    auto id = o.FindMember("playerId");
+    if (id != o.MemberEnd() && id->value.IsNumber()) p.playerId = id->value.GetInt64();
+    p.playerName = memberString(o, "playerName");
+    p.playerImageUrl = memberString(o, "playerImageUrl");
+    p.did = memberString(o, "did");
+    p.playerToken = memberString(o, "playerToken");
+    p.accessToken = memberString(o, "accessToken");
+    auto nu = o.FindMember("isNewUser");
+    p.isNewUser = nu != o.MemberEnd() && nu->value.IsBool() && nu->value.GetBool();
+    return p;
+}
+
+} // namespace
 
 HiveAuthV4::SetupResult HiveAuthV4::parseSetupReply(const HiveResponse& reply)
 {
@@ -23,12 +65,56 @@ HiveAuthV4::SetupResult HiveAuthV4::parseSetupReply(const HiveResponse& reply)
     return s;
 }
 
+HiveAuthV4::SignInResult HiveAuthV4::parseSignInReply(const HiveResponse& reply)
+{
+    SignInResult s;
+    s.delivered = reply.ok;
+    if (!reply.ok) return s;
+    s.result = reply.resultAPI();
+    s.playerInfo = parsePlayerInfo(reply);
+    return s;
+}
+
+HiveAuthV4::SignOutResult HiveAuthV4::parseSignOutReply(const HiveResponse& reply)
+{
+    SignOutResult s;
+    s.delivered = reply.ok;
+    if (!reply.ok) return s;
+    s.result = reply.resultAPI();
+    return s;
+}
+
 void HiveAuthV4::setup(SetupCallback callback)
 {
     const bool sent = _bridge.callAsync("AuthV4", "setup", HiveParams(), [callback](const HiveResponse& reply) {
         if (callback) callback(parseSetupReply(reply));
     });
     if (!sent && callback) callback(SetupResult());
+}
+
+void HiveAuthV4::signIn(const std::string& providerType, SignInCallback callback)
+{
+    const bool sent = _bridge.callAsync("AuthV4", "signIn", { { "providerType", providerType } },
+        [callback](const HiveResponse& reply) {
+            if (callback) callback(parseSignInReply(reply));
+        });
+    if (!sent && callback) callback(SignInResult());
+}
+
+void HiveAuthV4::showSignIn(SignInCallback callback)
+{
+    const bool sent = _bridge.callAsync("AuthV4", "showSignIn", HiveParams(), [callback](const HiveResponse& reply) {
+        if (callback) callback(parseSignInReply(reply));
+    });
+    if (!sent && callback) callback(SignInResult());
+}
+
+void HiveAuthV4::signOut(SignOutCallback callback)
+{
+    const bool sent = _bridge.callAsync("AuthV4", "signOut", HiveParams(), [callback](const HiveResponse& reply) {
+        if (callback) callback(parseSignOutReply(reply));
+    });
+    if (!sent && callback) callback(SignOutResult());
 }
 
 bool HiveAuthV4::terminateProcess()
