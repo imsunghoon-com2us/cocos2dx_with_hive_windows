@@ -23,7 +23,8 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
   AppId는 `-AppId` > 환경 변수 `HIVE_APP_ID` > 저장소 루트 `hive.local.json`(`{"appId":"...","zone":"..."}`, git 제외) 순으로,
   Zone은 `-Zone` > `hive.local.json`의 `zone` 순으로 적용된다(`HIVE_ZONE`은 게임 런타임용이라 읽지 않는다). 없으면 SDK 샘플 값
   (`steam`, `test`)이다. 매 실행이 샘플 설정을 다시 복사한 뒤 값을 덮어쓴다. 관찰상 **zone을 `test`에서 `real`로 바꾸자 다른 약관 화면이 다시 떴다.**
-  게임 키: `L` Hive 로그인 UI, `O` 로그아웃(로그인 UI가 떠 있는 동안에는 게임 키 입력을 무시한다).
+  게임 흐름(Phase 10): 타이틀 화면에서 초기화 -> `isAutoSignIn`이면 자동 로그인, 아니면 로그인 창 -> 아무 키로 시작. 우측 상단 Settings에서 로그아웃(연동 계정만)/계정 삭제.
+  실패하면 팝업 뒤 재시도 2회, 그래도 실패하면 종료 팝업 후 게임이 종료된다(SDK가 없는 PC도 마찬가지). 로그인/팝업이 떠 있는 동안에는 게임 키 입력을 무시한다. 자세한 내용은 `docs/11-title-login-settings.md`.
   SDK의 이용약관 동의는 사람이 직접 해야 한다(동의 전에는 `setup` 응답이 오지 않고 HUD가 `setup...`에 머문다).
   관찰상 **구성(exe 폴더)마다 처음 한 번** 필요했다: Release에서 동의한 뒤 같은 Release 폴더의 새 인스턴스는 3초 만에 `ready`가 됐지만,
   Debug 폴더에서는 약관이 다시 떴다(저장 위치는 확인하지 못했다).
@@ -58,5 +59,5 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 - 문서와 대화는 한국어로 쓴다.
 
 ## 인계 (새 세션은 먼저 읽을 것)
-- 현재 상태, 이 PC의 함정, 남은 작업은 `docs/09-handoff.md`에 정리돼 있다. Phase 9(다운로드 소스 SHA256 고정 + Hive SDK 고정 다운로드)는 브랜치 `phase9/sha256-pinning`에서 구현을 마쳤고 `main` 병합 확인을 기다린다(`docs/10-sha256-pinning.md`).
+- 현재 상태, 이 PC의 함정, 남은 작업은 `docs/09-handoff.md`에 정리돼 있다. Phase 9(다운로드 소스 SHA256 고정 + Hive SDK 고정 다운로드, `docs/10-sha256-pinning.md`)와 Phase 10(타이틀/로그인/설정 메뉴, `docs/11-title-login-settings.md`)까지 `main`에 병합돼 있다.
 - 미확인 항목(로그아웃, 자동 로그인, 한글 입력 IME, `<market>` 조합)은 확인된 것처럼 말하지 말고 미확인으로 다룬다.

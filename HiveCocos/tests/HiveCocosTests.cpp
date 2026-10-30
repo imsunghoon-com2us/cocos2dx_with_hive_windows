@@ -383,6 +383,83 @@ static void testSignInSignOut()
     CHECK_EQ(fake2->requests().size(), size_t(0));
 }
 
+static void testPlayerDeleteAndAutoSignIn()
+{
+    std::printf("player delete / isAutoSignIn / guest detection\n");
+    Fixture f;
+    HiveAuthV4 auth(f.bridge);
+
+    // playerDelete: same shape as signOut (class AuthV4, no parameters, handlerId >= 1).
+    HiveAuthV4::SignOutResult del;
+    int calls = 0;
+    auth.playerDelete([&](const HiveAuthV4::SignOutResult& r) { ++calls; del = r; });
+    auto reqs = f.fake->requests();
+    CHECK_EQ(reqs.size(), size_t(1));
+    rapidjson::Document r0 = parseJson(reqs[0]);
+    CHECK_EQ(std::string(r0["class"].GetString()), std::string("AuthV4"));
+    CHECK_EQ(std::string(r0["method"].GetString()), std::string("playerDelete"));
+    CHECK(r0["handlerId"].GetInt() >= 1);
+    f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(r0["handlerId"].GetInt()) +
+        ",\"resultAPI\":{\"errorCode\":-1,\"code\":-1200301,\"errorMessage\":\"denied\"}}");
+    f.queue.drain();
+    CHECK_EQ(calls, 1);
+    CHECK(del.delivered);
+    CHECK(!del.result.isSuccess());                  // a failed deletion keeps its code
+    CHECK_EQ(del.result.code, -1200301);
+
+    // isAutoSignIn: synchronous, answered as {"isAutoSignIn":bool}.
+    bool answer = true;
+    f.fake->setResponder([&answer](const std::string& req) -> std::string {
+        rapidjson::Document d = parseJson(req);
+        if (std::string(d["method"].GetString()) == "isAutoSignIn")
+            return std::string("{\"isAutoSignIn\":") + (answer ? "true" : "false") + "}";
+        return "{}";
+    });
+    CHECK(auth.isAutoSignIn());
+    answer = false;
+    CHECK(!auth.isAutoSignIn());
+    rapidjson::Document last = parseJson(f.fake->requests().back());
+    CHECK_EQ(std::string(last["class"].GetString()), std::string("AuthV4"));
+    CHECK_EQ(last["handlerId"].GetInt(), -1);        // sync calls carry no handler
+
+    auto fake2 = std::make_shared<FakeTransport>();
+    HiveBridge notStarted(fake2, nullptr);
+    CHECK(!HiveAuthV4(notStarted).isAutoSignIn());   // not started -> false, nothing sent
+    CHECK_EQ(fake2->requests().size(), size_t(0));
+
+    // Guest detection from the sign-in reply. Only provider NAMES are read.
+    auto parse = [](const std::string& playerInfoJson) {
+        HiveResponse reply;
+        reply.raw = "{\"resultAPI\":{\"errorCode\":0,\"code\":0},\"playerInfo\":" + playerInfoJson + "}";
+        reply.doc = std::make_shared<rapidjson::Document>();
+        reply.doc->Parse(reply.raw.c_str());
+        reply.ok = true;
+        return HiveAuthV4::parseSignInReply(reply).playerInfo;
+    };
+    const HivePlayerInfo linked = parse("{\"playerId\":1,\"providerInfoData\":{\"GOOGLE\":{\"providerType\":3,"
+        "\"providerUserId\":\"SECRET-USER-ID\",\"providerEmail\":\"secret@example.com\"}}}");
+    CHECK(linked.providerInfoKnown);
+    CHECK_EQ(linked.connectedProviders.size(), size_t(1));
+    CHECK_EQ(linked.connectedProviders[0], std::string("GOOGLE"));
+    CHECK(!linked.isGuest());
+    const std::string logged = linked.toString();
+    CHECK(logged.find("GOOGLE") != std::string::npos);
+    CHECK(logged.find("SECRET-USER-ID") == std::string::npos);     // user ids / e-mails never reach the log
+    CHECK(logged.find("secret@example.com") == std::string::npos);
+
+    const HivePlayerInfo guest = parse("{\"playerId\":2,\"providerInfoData\":{}}");
+    CHECK(guest.providerInfoKnown);
+    CHECK(guest.isGuest());
+
+    const HivePlayerInfo customOnly = parse("{\"playerId\":3,\"providerInfoData\":{},"
+        "\"customProviderInfoData\":{\"MYIDP\":{\"providerUserId\":\"x\"}}}");
+    CHECK(!customOnly.isGuest());                                   // a custom provider counts as connected
+
+    const HivePlayerInfo unknown = parse("{\"playerId\":4}");        // neither object: cannot tell -> not a guest
+    CHECK(!unknown.providerInfoKnown);
+    CHECK(!unknown.isGuest());
+}
+
 static void testDllTransportMissing()
 {
     std::printf("DllTransport (missing DLL)\n");
@@ -414,6 +491,7 @@ int main()
     testNotStartedAndFailures();
     testResultApi();
     testSignInSignOut();
+    testPlayerDeleteAndAutoSignIn();
     testDllTransportMissing();
 
     std::printf("\n%d checks, %d failed\n", g_checks, g_failures);

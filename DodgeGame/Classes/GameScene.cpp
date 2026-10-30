@@ -1,7 +1,8 @@
 ﻿#include "GameScene.h"
 
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
-#include "HiveService.h"
+#include "ModalDialog.h"
+#include "SettingsMenu.h"
 #endif
 
 USING_NS_CC;
@@ -78,22 +79,19 @@ void GameScene::setupHud()
     addChild(_scoreLabel, 10);
 
     _bestLabel = Label::createWithTTF(StringUtils::format("Best: %d", _bestScore), kFont, 24);
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+    // 우측 상단은 설정 버튼 자리이므로 최고 점수는 점수 아래(좌측)에 둔다.
+    _bestLabel->setAnchorPoint(Vec2(0.0f, 1.0f));
+    _bestLabel->setPosition(Vec2(origin.x + 12.0f, origin.y + visible.height - 40.0f));
+#else
     _bestLabel->setAnchorPoint(Vec2(1.0f, 1.0f));
     _bestLabel->setPosition(Vec2(origin.x + visible.width - 12.0f, origin.y + visible.height - 10.0f));
+#endif
     addChild(_bestLabel, 10);
 
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
-    _hiveLabel = Label::createWithTTF("", kFont, 14);
-    _hiveLabel->setAnchorPoint(Vec2(0.0f, 1.0f));
-    _hiveLabel->setPosition(Vec2(origin.x + 12.0f, origin.y + visible.height - 40.0f));
-    _hiveLabel->setTextColor(Color4B(160, 170, 190, 255));
-    addChild(_hiveLabel, 10);
-
-    _loginLabel = Label::createWithTTF("", kFont, 14);
-    _loginLabel->setAnchorPoint(Vec2(0.0f, 1.0f));
-    _loginLabel->setPosition(Vec2(origin.x + 12.0f, origin.y + visible.height - 58.0f));
-    _loginLabel->setTextColor(Color4B(120, 200, 150, 255));
-    addChild(_loginLabel, 10);
+    _settings = SettingsMenu::create();      // 우측 상단 설정 버튼(로그아웃 / 계정 삭제)
+    addChild(_settings, 20);
 #endif
 }
 
@@ -102,22 +100,14 @@ void GameScene::setupInput()
     auto keyboard = EventListenerKeyboard::create();
     keyboard->onKeyPressed = [this](EventKeyboard::KeyCode code, Event*) {
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
-        // Hive 로그인 UI가 떠 있는 동안에는 게임 키 입력(ESC 포함)을 무시한다. UI에 입력한 글자나 닫기용 ESC가 게임에 전달되지 않게 한다.
-        if (HiveService::instance().isLoginPending())
+        // 팝업이 떠 있는 동안(그리고 닫힌 직후)에는 게임 키 입력(ESC 포함)을 무시한다. 팝업을 닫은 Enter/Esc가 게임에 전달되지 않게 한다.
+        if (ModalDialog::inputBlocked())
         {
             return;
         }
 #endif
         switch (code)
         {
-#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
-        case EventKeyboard::KeyCode::KEY_L:
-            HiveService::instance().requestSignIn();
-            break;
-        case EventKeyboard::KeyCode::KEY_O:
-            HiveService::instance().requestSignOut();
-            break;
-#endif
         case EventKeyboard::KeyCode::KEY_LEFT_ARROW:
         case EventKeyboard::KeyCode::KEY_A:
             _leftDown = true;
@@ -160,6 +150,14 @@ void GameScene::setupInput()
     // 마우스(Windows에서는 터치로 변환된다): 누르고 있는 x 위치로 따라간다. 게임오버 후에는 재시작.
     auto touch = EventListenerTouchOneByOne::create();
     touch->onTouchBegan = [this](Touch* t, Event*) {
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+        // 설정 메뉴가 열려 있으면 바깥을 누른 것은 메뉴를 닫을 뿐이다(플레이어 이동이나 재시작으로 이어지지 않는다).
+        if (_settings && _settings->isPanelOpen())
+        {
+            _settings->closePanel();
+            return true;
+        }
+#endif
         if (_state == State::GameOver)
         {
             if (canRestart())
@@ -181,16 +179,10 @@ void GameScene::setupInput()
 void GameScene::update(float dt)
 {
 #if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
-    // Hive 상태는 비동기로 바뀌므로 달라졌을 때만 라벨을 갱신한다(게임오버 중에도 표시).
-    if (_hiveLabel && _hiveStatusShown != HiveService::instance().status())
+    // 설정 메뉴나 팝업이 열려 있는 동안에는 게임을 멈춘다.
+    if ((_settings && _settings->isPanelOpen()) || ModalDialog::isOpen())
     {
-        _hiveStatusShown = HiveService::instance().status();
-        _hiveLabel->setString(_hiveStatusShown);
-    }
-    if (_loginLabel && _loginStatusShown != HiveService::instance().loginStatus())
-    {
-        _loginStatusShown = HiveService::instance().loginStatus();
-        _loginLabel->setString(_loginStatusShown);
+        return;
     }
 #endif
 

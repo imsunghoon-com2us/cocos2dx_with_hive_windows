@@ -76,9 +76,15 @@ elseif(WINDOWS)
          proj.win32/main.h
          proj.win32/resource.h
          Classes/HiveService.h
+         Classes/ModalDialog.h
+         Classes/SettingsMenu.h
+         Classes/TitleScene.h
          )
     list(APPEND GAME_SOURCE
          Classes/HiveService.cpp
+         Classes/ModalDialog.cpp
+         Classes/SettingsMenu.cpp
+         Classes/TitleScene.cpp
          proj.win32/main.cpp
          proj.win32/game.rc
          ${common_res_files}
