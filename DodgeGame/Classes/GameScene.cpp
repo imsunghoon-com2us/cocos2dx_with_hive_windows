@@ -1,5 +1,9 @@
 ﻿#include "GameScene.h"
 
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+#include "HiveService.h"
+#endif
+
 USING_NS_CC;
 
 namespace
@@ -77,6 +81,14 @@ void GameScene::setupHud()
     _bestLabel->setAnchorPoint(Vec2(1.0f, 1.0f));
     _bestLabel->setPosition(Vec2(origin.x + visible.width - 12.0f, origin.y + visible.height - 10.0f));
     addChild(_bestLabel, 10);
+
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+    _hiveLabel = Label::createWithTTF("", kFont, 14);
+    _hiveLabel->setAnchorPoint(Vec2(0.0f, 1.0f));
+    _hiveLabel->setPosition(Vec2(origin.x + 12.0f, origin.y + visible.height - 40.0f));
+    _hiveLabel->setTextColor(Color4B(160, 170, 190, 255));
+    addChild(_hiveLabel, 10);
+#endif
 }
 
 void GameScene::setupInput()
@@ -147,6 +159,15 @@ void GameScene::setupInput()
 
 void GameScene::update(float dt)
 {
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+    // Hive 상태는 비동기로 바뀌므로 달라졌을 때만 라벨을 갱신한다(게임오버 중에도 표시).
+    if (_hiveLabel && _hiveStatusShown != HiveService::instance().status())
+    {
+        _hiveStatusShown = HiveService::instance().status();
+        _hiveLabel->setString(_hiveStatusShown);
+    }
+#endif
+
     if (_state == State::GameOver)
     {
         _gameOverElapsed += dt;

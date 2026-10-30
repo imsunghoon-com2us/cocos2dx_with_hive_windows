@@ -70,8 +70,10 @@ elseif(WINDOWS)
     list(APPEND GAME_HEADER
          proj.win32/main.h
          proj.win32/resource.h
+         Classes/HiveService.h
          )
     list(APPEND GAME_SOURCE
+         Classes/HiveService.cpp
          proj.win32/main.cpp
          proj.win32/game.rc
          ${common_res_files}
@@ -122,6 +124,11 @@ else()
 endif()
 
 target_link_libraries(${APP_NAME} cocos2d)
+if(WINDOWS)
+    # Hive SDK bridge (Windows). Lives next to DodgeGame in the repository.
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../HiveCocos ${CMAKE_BINARY_DIR}/HiveCocos)
+    target_link_libraries(${APP_NAME} HiveCocosAdapter)
+endif()
 target_include_directories(${APP_NAME}
         PRIVATE Classes
         PRIVATE ${COCOS2DX_ROOT_PATH}/cocos/audio/include/

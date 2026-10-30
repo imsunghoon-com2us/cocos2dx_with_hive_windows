@@ -56,4 +56,4 @@ Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작
 - [x] Phase 3: 미니게임 구현
 - [x] Phase 4: 리뷰와 디버깅
 - [x] Phase 5: 엔진·게임 x64 전환 (브랜치 `phase5/x64-migration`, `main` 병합 전)
-- [ ] Phase 6: Hive SDK 연동 — 초기화 + 설정 (브랜치 `phase6/hive-sdk-init`)
+- [ ] Phase 6: Hive SDK 연동 — 초기화 + 설정 (브랜치 `phase6/hive-sdk-init`). 구현·시험 완료, **`setup` 응답(약관 동의 필요) 확인 대기**

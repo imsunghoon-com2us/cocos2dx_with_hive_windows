@@ -56,6 +56,8 @@ private:
     cocos2d::DrawNode* _player = nullptr;
     cocos2d::Label* _scoreLabel = nullptr;
     cocos2d::Label* _bestLabel = nullptr;
+    cocos2d::Label* _hiveLabel = nullptr;     // Hive SDK 상태 한 줄 (Windows 빌드에서만 사용)
+    std::string _hiveStatusShown;
     cocos2d::Node* _gameOverPanel = nullptr;
     std::vector<Obstacle> _obstacles;
 
