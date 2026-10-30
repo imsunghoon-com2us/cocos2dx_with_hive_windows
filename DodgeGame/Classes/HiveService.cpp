@@ -8,6 +8,7 @@
 #include "cocos2d.h"
 
 #include <cstdlib>
+#include <tlhelp32.h>
 
 USING_NS_CC;
 using namespace hivecocos;
@@ -22,6 +23,37 @@ std::string getEnv(const char* name)
     std::string s(value);
     free(value);
     return s;
+}
+
+// The Hive UI runs in CEF child processes (cef.subprocess.exe). After a normal exit they were seen to stay alive for
+// minutes (2+ minutes measured): they show up in the task manager and keep files of the build folder locked. At exit
+// they are still our children, so only those are terminated here.
+void terminateCefChildren()
+{
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return;
+
+    const DWORD self = GetCurrentProcessId();
+    PROCESSENTRY32W entry;
+    entry.dwSize = sizeof(entry);
+    int terminated = 0;
+    if (Process32FirstW(snapshot, &entry))
+    {
+        do
+        {
+            if (entry.th32ParentProcessID == self && _wcsicmp(entry.szExeFile, L"cef.subprocess.exe") == 0)
+            {
+                HANDLE process = OpenProcess(PROCESS_TERMINATE, FALSE, entry.th32ProcessID);
+                if (process)
+                {
+                    if (TerminateProcess(process, 0)) ++terminated;
+                    CloseHandle(process);
+                }
+            }
+        } while (Process32NextW(snapshot, &entry));
+    }
+    CloseHandle(snapshot);
+    log("[Hive] terminated %d cef.subprocess child process(es)", terminated);
 }
 }
 
@@ -323,4 +355,5 @@ void HiveService::shutdown()
     HiveAuthV4(*_bridge).terminateProcess();
     _bridge->shutdown();
     _bridge.reset();
+    terminateCefChildren();
 }
