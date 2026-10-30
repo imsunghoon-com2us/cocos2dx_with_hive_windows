@@ -5,8 +5,8 @@
  add_library(external empty.cpp)
  
 -add_subdirectory(Box2D)
-+# COCOS_USE_NETWORK / COCOS_USE_BULLET_BOX2D are declared in cocos/CMakeLists.txt (default ON).
-+# The x64 build turns them OFF: there are no x64 prebuilts of these libraries.
++# COCOS_USE_NETWORK / COCOS_USE_BULLET_BOX2D are declared in cocos/CMakeLists.txt (default OFF):
++# there are no x64 prebuilts of these libraries.
 +if(COCOS_USE_BULLET_BOX2D)
 +    add_subdirectory(Box2D)
 +    add_subdirectory(bullet)
@@ -85,10 +85,10 @@
  
  set(COCOS_CORE_LIB cocos2d)
  
-+# Optional modules. The defaults keep the stock behaviour. The x64 build turns them OFF because
-+# there are no x64 builds of curl/openssl/libwebsockets/libuv/Box2D/Bullet (see tools/build_deps_x64.ps1).
-+option(COCOS_USE_NETWORK "Build the network module (HttpClient, WebSocket, SocketIO, Downloader)" ON)
-+option(COCOS_USE_BULLET_BOX2D "Link Box2D and Bullet (3D physics)" ON)
++# Optional modules, OFF by default: there are no x64 builds of curl/openssl/libwebsockets/libuv/Box2D/Bullet
++# (see tools/build_deps_x64.ps1). Turn them ON only after providing x64 builds of those libraries.
++option(COCOS_USE_NETWORK "Build the network module (HttpClient, WebSocket, SocketIO, Downloader)" OFF)
++option(COCOS_USE_BULLET_BOX2D "Link Box2D and Bullet (3D physics)" OFF)
 +
  include(2d/CMakeLists.txt)
  include(3d/CMakeLists.txt)

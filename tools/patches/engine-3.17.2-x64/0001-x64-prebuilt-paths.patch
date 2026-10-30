@@ -1,19 +1,14 @@
 --- a/external/cmake/CocosExternalConfig.cmake
 +++ b/external/cmake/CocosExternalConfig.cmake
-@@ -33,7 +33,16 @@
+@@ -33,7 +33,11 @@
      set(platform_spec_path android/${ANDROID_ABI})
  elseif(WINDOWS)
      set(platform_name win32)
 -    set(platform_spec_path win32)
-+    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
-+        # x64 prebuilt binaries live next to the win32 ones in a "win64" folder (built by tools/build_deps_x64.ps1).
-+        # Headers are shared with win32 (platform_name stays win32).
-+        set(win_arch_dir win64)
-+        set(win_prebuilt_subdir "win64/")
-+    else()
-+        set(win_arch_dir win32)
-+        set(win_prebuilt_subdir "")
-+    endif()
++    # x64 only: the prebuilt binaries live next to the stock win32 ones in a "win64" folder (built by tools/build_deps_x64.ps1).
++    # Headers are shared with win32 (platform_name stays win32).
++    set(win_arch_dir win64)
++    set(win_prebuilt_subdir "win64/")
 +    set(platform_spec_path ${win_arch_dir})
  elseif(MACOSX)
      set(platform_name mac)
