@@ -61,13 +61,23 @@ function Invoke-Native([string]$Exe, [string[]]$ArgList, [string]$Log) {
 function Remove-Tree([string]$Path) { if (Test-Path $Path) { [IO.Directory]::Delete($Path, $true) } }
 
 # download (cached) + extract (cached); returns the source root
-function Get-Source([string]$Name, [string]$Url) {
+function Get-Source([string]$Name, [string]$Url, [string]$Sha256) {
+    if ($Sha256 -notmatch '^[0-9A-Fa-f]{64}$') { throw "no pinned SHA256 for '$Name' (every source must be pinned, see docs\10-sha256-pinning.md)" }
     $zip = Join-Path $DlDir "$Name.zip"
     $dst = Join-Path $SrcDir $Name
     if (-not (Test-Path $zip)) {
         Write-Host "  download $Url"
         Invoke-WebRequest -Uri $Url -OutFile "$zip.part" -UseBasicParsing
         Move-Item "$zip.part" $zip
+    }
+    # Verify on every call: right after the download and also when the cached zip is reused.
+    $actual = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash
+    if ($actual -ne $Sha256.ToUpperInvariant()) {
+        Remove-Item -LiteralPath $zip -Force
+        Remove-Tree $dst
+        throw ("SHA256 mismatch for '$Name' ($Url)`n  expected: $($Sha256.ToUpperInvariant())`n  actual  : $actual`n" +
+               "  The archive and its extracted tree were deleted. Cause: the upstream file changed or was tampered with, " +
+               "or (GitHub archive/*.zip) it was re-compressed. Do not just edit the hash: see docs\10-sha256-pinning.md.")
     }
     if (-not (Test-Path (Join-Path $dst '.extracted'))) {
         Remove-Tree $dst
@@ -137,7 +147,7 @@ function Build-Zlib($src, $lib) {
 
 function Build-Libpng($src, $lib) {
     $st = Get-Stage 'zlib'
-    if (-not (Test-Path "$st\lib\zlib.lib")) { Write-Host '  (staging zlib first)'; Build-Zlib (Get-Source 'zlib' $script:Libs['zlib'].Url) $null }
+    if (-not (Test-Path "$st\lib\zlib.lib")) { Write-Host '  (staging zlib first)'; Build-Zlib (Get-Source 'zlib' $script:Libs['zlib'].Url $script:Libs['zlib'].Sha256) $null }
     $bd = Build-CMake libpng $src @('-DPNG_SHARED=OFF', '-DPNG_STATIC=ON', '-DPNG_TESTS=OFF', "-DZLIB_INCLUDE_DIR=$st\include", "-DZLIB_LIBRARY=$st\lib\zlib.lib")
     $built = Get-ChildItem $bd -Recurse -Filter '*.lib' -File | Where-Object { $_.FullName -match '\\Release\\' -and $_.Name -match 'png' } | Select-Object -First 1
     if (-not $built) { throw 'libpng static lib not found' }
@@ -212,7 +222,7 @@ function Build-Ogg($src, $lib) {
 
 function Build-Vorbis($src, $lib) {
     $st = Get-Stage 'ogg'
-    if (-not (Test-Path "$st\lib\libogg.lib")) { Write-Host '  (staging ogg first)'; Build-Ogg (Get-Source 'ogg' $script:Libs['ogg'].Url) $null }
+    if (-not (Test-Path "$st\lib\libogg.lib")) { Write-Host '  (staging ogg first)'; Build-Ogg (Get-Source 'ogg' $script:Libs['ogg'].Url $script:Libs['ogg'].Sha256) $null }
     $ren = Join-Path $Helpers 'rename_outputs.cmake'
     $bd = Build-CMake vorbis $src @('-DBUILD_SHARED_LIBS=ON', '-DBUILD_TESTING=OFF', "-DOGG_INCLUDE_DIR=$st\include", "-DOGG_LIBRARY=$st\lib\libogg.lib", "-DCMAKE_PROJECT_INCLUDE=$ren", '-DRENAME_TARGETS=vorbis;vorbisfile', '-DRENAME_PREFIX=lib') -Targets @('vorbis', 'vorbisfile')
     $out = Join-Path $E 'win32-specific\OggDecoder\prebuilt\win64'
@@ -246,36 +256,36 @@ function Build-Iconv($src, $lib) {
 
 # ---------------------------------------------------------------- table
 $script:Libs = [ordered]@{
-    'zlib'     = @{ Version = '1.3.1';    Url = 'https://github.com/madler/zlib/archive/refs/tags/v1.3.1.zip';                      Recipe = ${function:Build-Zlib};
+    'zlib'     = @{ Version = '1.3.1';    Url = 'https://github.com/madler/zlib/archive/refs/tags/v1.3.1.zip';                      Sha256 = '50B24B47BF19E1F35D2A21FF36D2A366638CDF958219A66F30CE0861201760E6'; Recipe = ${function:Build-Zlib};
                     Outputs = 'win32-specific\zlib\prebuilt\win64\zlib1.dll', 'win32-specific\zlib\prebuilt\win64\libzlib.lib' }
-    'libpng'   = @{ Version = '1.6.16';   Url = 'https://github.com/glennrp/libpng/archive/refs/tags/v1.6.16.zip';                 Recipe = ${function:Build-Libpng};
+    'libpng'   = @{ Version = '1.6.16';   Url = 'https://github.com/glennrp/libpng/archive/refs/tags/v1.6.16.zip';                 Sha256 = '631DAB2825E60139A0367448AD8AB8AD43A2855F7F46E651E8788AC84F53276F'; Recipe = ${function:Build-Libpng};
                     Outputs = 'png\prebuilt\win64\libpng.lib' }
-    'jpeg'     = @{ Version = 'IJG 9';    Url = 'https://www.ijg.org/files/jpegsr9.zip';                                            Recipe = ${function:Build-Jpeg};
+    'jpeg'     = @{ Version = 'IJG 9';    Url = 'https://www.ijg.org/files/jpegsr9.zip';                                            Sha256 = '3320BB7D5BCD0C9ABCF89F2176BDB04334344B649FDAB1D85339BDA1E39B88B1'; Recipe = ${function:Build-Jpeg};
                     Outputs = 'jpeg\prebuilt\win64\libjpeg.lib' }
-    'tiff'     = @{ Version = '4.0.3';    Url = 'https://download.osgeo.org/libtiff/old/tiff-4.0.3.zip';                            Recipe = ${function:Build-Tiff};
+    'tiff'     = @{ Version = '4.0.3';    Url = 'https://download.osgeo.org/libtiff/old/tiff-4.0.3.zip';                            Sha256 = 'C77F0D23B4C6FEF96ED18DDC811990B35687848CCD2BACD7EDC327B5795B6481'; Recipe = ${function:Build-Tiff};
                     Outputs = 'tiff\prebuilt\win64\libtiff.lib' }
-    'webp'     = @{ Version = '0.4.4';    Url = 'https://github.com/webmproject/libwebp/archive/refs/tags/v0.4.4.zip';              Recipe = ${function:Build-Webp};
+    'webp'     = @{ Version = '0.4.4';    Url = 'https://github.com/webmproject/libwebp/archive/refs/tags/v0.4.4.zip';              Sha256 = '952E58039C197F22E6C9DA59A19AD18274BCE195FDB1DF9BD2763A6E262C660E'; Recipe = ${function:Build-Webp};
                     Outputs = 'webp\prebuilt\win64\libwebp.lib' }
-    'freetype' = @{ Version = '2.5.5';    Url = 'https://github.com/freetype/freetype/archive/refs/tags/VER-2-5-5.zip';             Recipe = ${function:Build-Freetype};
+    'freetype' = @{ Version = '2.5.5';    Url = 'https://github.com/freetype/freetype/archive/refs/tags/VER-2-5-5.zip';             Sha256 = '68D86CB1C2883513D33BAAA114ECBC04DEE12D788624C97C7C9415897ED62136'; Recipe = ${function:Build-Freetype};
                     Outputs = 'freetype2\prebuilt\win64\freetype.lib' }
-    'glfw3'    = @{ Version = '3.2.1';    Url = 'https://github.com/glfw/glfw/archive/refs/tags/3.2.1.zip';                         Recipe = ${function:Build-Glfw3};
+    'glfw3'    = @{ Version = '3.2.1';    Url = 'https://github.com/glfw/glfw/archive/refs/tags/3.2.1.zip';                         Sha256 = '0C623F65A129C424D0FA45591694FDE3719AD4A0955D4835182FDA71B255446F'; Recipe = ${function:Build-Glfw3};
                     Outputs = 'glfw3\prebuilt\win64\glfw3.lib' }
-    'glew'     = @{ Version = '2.2.0';    Url = 'https://github.com/nigels-com/glew/releases/download/glew-2.2.0/glew-2.2.0.zip';   Recipe = ${function:Build-Glew};
+    'glew'     = @{ Version = '2.2.0';    Url = 'https://github.com/nigels-com/glew/releases/download/glew-2.2.0/glew-2.2.0.zip';   Sha256 = 'A9046A913774395A095EDCC0B0AC2D81C3AACCA61787B39839B941E9BE14E0D4'; Recipe = ${function:Build-Glew};
                     Outputs = 'win32-specific\gles\prebuilt\win64\glew32.dll', 'win32-specific\gles\prebuilt\win64\glew32.lib' }
-    'sqlite3'  = @{ Version = '3.45.3';   Url = 'https://www.sqlite.org/2024/sqlite-amalgamation-3450300.zip';                      Recipe = ${function:Build-Sqlite3};
+    'sqlite3'  = @{ Version = '3.45.3';   Url = 'https://www.sqlite.org/2024/sqlite-amalgamation-3450300.zip';                      Sha256 = 'EA170E73E447703E8359308CA2E4366A3AE0C4304A8665896F068C736781C651'; Recipe = ${function:Build-Sqlite3};
                     Outputs = 'sqlite3\libraries\win64\sqlite3.dll', 'sqlite3\libraries\win64\sqlite3.lib' }
-    'chipmunk' = @{ Version = '7.0.1';    Url = 'https://github.com/slembcke/Chipmunk2D/archive/refs/tags/Chipmunk-7.0.1.zip';      Recipe = ${function:Build-Chipmunk};
+    'chipmunk' = @{ Version = '7.0.1';    Url = 'https://github.com/slembcke/Chipmunk2D/archive/refs/tags/Chipmunk-7.0.1.zip';      Sha256 = '37E250EF7CCD319C475DD3CB153D0E89BBEF3C25F0214602E165D6E8FCA5F490'; Recipe = ${function:Build-Chipmunk};
                     Outputs = 'chipmunk\prebuilt\win64\debug-lib\libchipmunk.lib', 'chipmunk\prebuilt\win64\release-lib\libchipmunk.lib' }
-    'openal'   = @{ Version = '1.19.1';   Url = 'https://github.com/kcat/openal-soft/archive/refs/tags/openal-soft-1.19.1.zip';     Recipe = ${function:Build-OpenAL};
+    'openal'   = @{ Version = '1.19.1';   Url = 'https://github.com/kcat/openal-soft/archive/refs/tags/openal-soft-1.19.1.zip';     Sha256 = '059A1BDB65074FDE5FCE10CCAC073B9FC12A663069418A54A46804768D33244E'; Recipe = ${function:Build-OpenAL};
                     Outputs = 'win32-specific\OpenalSoft\prebuilt\win64\OpenAL32.dll', 'win32-specific\OpenalSoft\prebuilt\win64\OpenAL32.lib' }
-    'ogg'      = @{ Version = '1.3.5';    Url = 'https://github.com/xiph/ogg/archive/refs/tags/v1.3.5.zip';                         Recipe = ${function:Build-Ogg};
+    'ogg'      = @{ Version = '1.3.5';    Url = 'https://github.com/xiph/ogg/archive/refs/tags/v1.3.5.zip';                         Sha256 = '4FD31A41AB178BAF2F2204C48D67EC21292C69CCC03DF126451B4701862C13F8'; Recipe = ${function:Build-Ogg};
                     Outputs = 'win32-specific\OggDecoder\prebuilt\win64\libogg.dll', 'win32-specific\OggDecoder\prebuilt\win64\libogg.lib' }
-    'vorbis'   = @{ Version = '1.3.7';    Url = 'https://github.com/xiph/vorbis/archive/refs/tags/v1.3.7.zip';                      Recipe = ${function:Build-Vorbis};
+    'vorbis'   = @{ Version = '1.3.7';    Url = 'https://github.com/xiph/vorbis/archive/refs/tags/v1.3.7.zip';                      Sha256 = '0580E02B3A3E566FB2178C5536D7E47E04EA2E90AC47C742D152AFC32324BEF4'; Recipe = ${function:Build-Vorbis};
                     Outputs = 'win32-specific\OggDecoder\prebuilt\win64\libvorbis.dll', 'win32-specific\OggDecoder\prebuilt\win64\libvorbis.lib',
                               'win32-specific\OggDecoder\prebuilt\win64\libvorbisfile.dll', 'win32-specific\OggDecoder\prebuilt\win64\libvorbisfile.lib' }
-    'mpg123'   = @{ Version = '1.32.10';  Url = 'https://www.mpg123.de/download/win64/1.32.10/mpg123-1.32.10-x86-64.zip';            Recipe = ${function:Build-Mpg123};
+    'mpg123'   = @{ Version = '1.32.10';  Url = 'https://www.mpg123.de/download/win64/1.32.10/mpg123-1.32.10-x86-64.zip';            Sha256 = '3299EDC2A29BB0B4A2015D1C2E2492C33575B21A66A021F58B9D2B79FDF6BA81'; Recipe = ${function:Build-Mpg123};
                     Outputs = 'win32-specific\MP3Decoder\prebuilt\win64\libmpg123.dll', 'win32-specific\MP3Decoder\prebuilt\win64\libmpg123.lib' }
-    'iconv'    = @{ Version = 'win-iconv 0.0.8'; Url = 'https://github.com/win-iconv/win-iconv/archive/refs/tags/v0.0.8.zip';       Recipe = ${function:Build-Iconv};
+    'iconv'    = @{ Version = 'win-iconv 0.0.8'; Url = 'https://github.com/win-iconv/win-iconv/archive/refs/tags/v0.0.8.zip';       Sha256 = '2C29910A86470B4695885E78390F960E586F524A89FE2FC5F2F5E257E690C328'; Recipe = ${function:Build-Iconv};
                     Outputs = 'win32-specific\icon\prebuilt\win64\iconv.dll', 'win32-specific\icon\prebuilt\win64\libiconv.lib' }
 }
 
@@ -297,7 +307,7 @@ foreach ($n in $names) {
         Write-Host '  skip (outputs exist)'; $results[$n] = 'SKIP'; continue
     }
     try {
-        $src = Get-Source $n $lib.Url
+        $src = Get-Source $n $lib.Url $lib.Sha256
         & $lib.Recipe $src $lib
         foreach ($o in $outs) {
             if (-not (Test-Path $o)) { throw "missing output: $o" }

@@ -14,6 +14,8 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 ## 명령
 - 엔진 복원: `tools/setup_engine.ps1` (엔진 다운로드, **x64 패치 적용**, `DodgeGame\cocos2d` junction 생성)
 - x64 라이브러리 빌드: `tools/build_deps_x64.ps1` (약 25분, 이미 있으면 건너뜀. `-Only`, `-Force`)
+  - **다운로드 소스는 SHA256으로 고정**돼 있고(`build_deps_x64.ps1`의 `Sha256`, `setup_engine.ps1`의 해시 상수) 불일치하면 지우고 중단한다. 우회 옵션은 없다.
+    버전을 올릴 때는 URL, 버전, 해시를 한 커밋에서 함께 고치고 `docs/10-sha256-pinning.md`의 절차(교차 확인, GitHub archive 재압축 주의)를 따른다. 불일치가 났다고 해시만 바꾸지 않는다.
 - 빌드: `tools/build.ps1 -Config Debug|Release [-Clean]` (산출물 `DodgeGame\build-x64`)
 - Hive SDK 런타임 배치: `tools/setup_hive.ps1 -Config Debug|Release [-AppId <id>] [-Zone real|test|sandbox]` (변경분만 복사, 구성당 약 740MB).
   AppId는 `-AppId` > 환경 변수 `HIVE_APP_ID` > 저장소 루트 `hive.local.json`(`{"appId":"...","zone":"..."}`, git 제외) 순으로,
