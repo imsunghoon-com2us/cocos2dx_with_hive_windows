@@ -1,0 +1,16 @@
+{
+  "version": "26.7.0",
+  "releasePage": "https://developers.hiveplatform.ai/ko/latest/releases/unreal5/",
+  "windows": {
+    "url": "https://hive-fn.qpyou.cn/hivedev/sdk/crossplay/unreal/Hive%20SDK%20v4%20Windows%20UnrealEngine5%2026.7.0.zip?t=1",
+    "sha256": "80F5106462E1C4640A028B1A67FBBB5644A716C07AD89029FE46DA16AA0179D0",
+    "size": 592480974,
+    "folder": "Hive SDK v4 Windows UnrealEngine5 26.7.0"
+  },
+  "interface": {
+    "url": "https://hive-fn.qpyou.cn/hivedev/sdk/hive_sdk_v4_with_core/unreal/Hive_SDK_v4_UE5_Interface_26.7.0.zip",
+    "sha256": "69D96581E1C4F9E3EBBC049BFD1125423DCF813B19F31E56ADDB89E87E69C402",
+    "size": 8023475,
+    "folder": "Hive_SDK_v4_UE5_Interface_26.7.0"
+  }
+}
