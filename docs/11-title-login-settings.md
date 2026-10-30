@@ -59,10 +59,17 @@ GameScene 우측 상단 [Settings]
 - 원인을 코드로 끝까지 확인한 것은 아니고, 조치 뒤 같은 시나리오(Enter만으로 3번)가 통과했다. 조치: 키로 팝업을 닫거나 타이틀에서 키로 로그인을 시작하면 **0.25초 뒤에** 동작을 실행해 키 뗌이 먼저 게임에 도착하게 한다(`ModalDialog::choose`, `TitleScene::onAction`).
 
 ## 약관 시험용 Reset 메뉴 (Settings -> Reset terms)
-설정 드롭다운의 `Reset terms`는 SDK의 `AuthV4.resetAgreement`("약관동의 관련 데이터를 초기화")를 부른다. 게스트/연동 계정 모두에게 보이고, 누르면 안내 팝업이 뜬다.
-SDK가 시작되지 않았으면 `Reset failed (Hive SDK not available).`가 뜬다(임시 씬으로 화면 확인). 어댑터는 `HiveAuthV4::resetAgreement()`(동기, 응답에 결과가 없어 "요청을 보냈는가"만 반환)이고 단위 시험이 있다(153개).
+`resetAgreement`만 부르면 약관이 다시 뜨지 않아(사용자 확인), **초기화(`setup`)를 다시 해야 약관이 뜬다**는 전제로 흐름을 바꿨다.
+- 연동 계정: `AuthV4.resetAgreement` -> 로그아웃 -> 타이틀로 이동 -> Hive 초기화(`setup`) 재실행(`HiveService::requestResetTerms`, `reinitialize`). 이후 로그인은 시작할 때처럼 자동으로 이어진다.
+- 게스트 계정: 로그아웃하면 다시 로그인할 수 없으므로 먼저 팝업("This is a guest account. Resetting the terms deletes it. This cannot be undone. Continue?", Continue/Cancel)으로 알리고,
+  Continue이면 `resetAgreement` -> **계정 삭제** -> 타이틀 -> 초기화 재실행. Cancel/Esc는 아무 일도 하지 않는다.
+- 계정 종류를 알 수 없으면(로그인 응답에 Provider 정보가 없음) 연동 계정을 지울 위험이 있어 **실행하지 않고** 안내 팝업만 띄운다. 로그인하지 않았으면 "available only while signed in".
+- 실패하면 `Reset terms failed (<사유>).` 팝업. 초기화 재실행에도 기존 실패 정책(팝업, 재시도 2회, 종료)이 적용된다.
+- **미확인**: 이미 초기화한 SDK에 `setup`을 다시 부르는 것이 허용되는지(문서에 없음), 그리고 이 흐름으로 약관이 실제로 다시 뜨는지. 로그인한 상태가 필요해 자동으로 시험하지 못했다(사용자 확인 필요).
+  게스트 확인 팝업과 계정 삭제도 실제 계정으로는 시험하지 않았다.
 
-**효과는 확인되지 않았다.** 로그인하지 않은 상태에서 이 호출을 setup 전, setup 후에 각각 넣어 보았지만 다음 실행에 약관이 다시 뜨지 않았다(`propFolder`의 파일도 그대로). 로그인한 상태(메뉴가 보이는 조건)에서의 효과는 시험하지 못했다.
+초기에 구현한 "호출만 하는" 버전의 시험 결과(참고): 어댑터 `HiveAuthV4::resetAgreement()`(동기, 응답에 결과가 없어 "요청을 보냈는가"만 반환, 단위 시험 153개).
+로그인하지 않은 상태에서 이 호출을 setup 전, setup 후에 각각 넣어 보았지만 다음 실행에 약관이 다시 뜨지 않았다(`propFolder`의 파일도 그대로).
 
 약관이 **다시 뜨는 것이 확인된 방법**(2026-10-30, Release, real 존. 스냅샷으로 복원하며 시험):
 - `<exe 폴더>\propFolder\REAL_HiveProperty.dat` 삭제 또는 `propFolder` 폴더 삭제 -> 다음 실행에서 약관 표시. 게임을 실행 중에 지운 뒤 정상/강제 종료해도 파일이 다시 생기지 않아 마찬가지였다.

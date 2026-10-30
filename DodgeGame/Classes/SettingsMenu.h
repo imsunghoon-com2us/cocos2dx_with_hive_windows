@@ -6,7 +6,8 @@
 // The "Settings" button in the top-right corner of the game screen and its small drop-down menu:
 //   Log out          only for a linked (non-guest) account: a guest cannot sign in again after signing out
 //   Delete account   after a Delete / Cancel confirmation (irreversible)
-//   Reset terms      test aid: AuthV4.resetAgreement (always shown)
+//   Reset terms      test aid: AuthV4.resetAgreement, sign out (a guest account is deleted after a Continue / Cancel
+//                    question), back to the title and initialize the Hive SDK again, which shows the terms again
 // A successful sign-out or deletion returns to the title screen, where a key press starts a new sign-in.
 // While the drop-down is open the game is paused (GameScene asks isPanelOpen()).
 class SettingsMenu : public cocos2d::Node

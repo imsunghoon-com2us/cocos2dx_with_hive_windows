@@ -138,14 +138,51 @@ void SettingsMenu::onResetTerms()
     closePanel();
     if (ModalDialog::isOpen()) return;
 
-    // Test aid: AuthV4.resetAgreement clears the SDK's stored terms agreement data.
-    if (HiveService::instance().resetAgreement())
+    // Test aid. Reset the terms, sign out (a guest account is deleted instead), go to the title and run the Hive
+    // initialization again: the terms show again with the new initialization.
+    HiveService& hive = HiveService::instance();
+    if (hive.isBusy()) return;
+
+    auto run = []() {
+        HiveService::instance().requestResetTerms([](bool ok, const std::string& reason) {
+            if (ok)
+            {
+                // The initialization is already running again; the title shows its progress (and the terms).
+                goToTitle();
+            }
+            else
+            {
+                showMessage("Reset terms failed (" + reason + ").");
+            }
+        });
+    };
+
+    switch (hive.accountKind())
     {
-        showMessage("Terms agreement data was reset.\nRestart the game to see the terms.");
+    case HiveService::AccountKind::Linked:
+        run();
+        break;
+    case HiveService::AccountKind::Guest:
+    {
+        // A guest cannot sign in again after signing out, so the account is deleted: ask first.
+        auto scene = Director::getInstance()->getRunningScene();
+        auto dialog = ModalDialog::create("This is a guest account.\nResetting the terms deletes it.\nThis cannot be undone.\nContinue?",
+                                          { "Continue", "Cancel" }, [run](int index) {
+            if (index == 0) run();      // Cancel / Esc: nothing happens
+        });
+        if (scene && dialog)
+        {
+            scene->addChild(dialog, 1000);
+        }
+        break;
     }
-    else
-    {
-        showMessage("Reset failed (Hive SDK not available).");
+    case HiveService::AccountKind::Unknown:
+        // It could be a linked account, and a deletion cannot be undone: do nothing.
+        showMessage("Reset terms is not available:\nthe account type is unknown.");
+        break;
+    default:
+        showMessage("Reset terms is available\nonly while signed in.");
+        break;
     }
 }
 
