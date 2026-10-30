@@ -75,16 +75,9 @@ void HiveService::setLoginStatus(const std::string& status)
     log("[Hive] %s", status.c_str());
 }
 
-HiveService::AccountKind HiveService::accountKind() const
-{
-    if (!_signedIn) return AccountKind::None;
-    if (!_player.providerInfoKnown) return AccountKind::Unknown;
-    return _player.connectedProviders.empty() ? AccountKind::Guest : AccountKind::Linked;
-}
-
 bool HiveService::canSignOut() const
 {
-    return accountKind() == AccountKind::Linked;
+    return _signedIn && _player.providerInfoKnown && !_player.connectedProviders.empty();
 }
 
 std::string HiveService::playerLabel() const
@@ -289,61 +282,6 @@ void HiveService::requestSignIn()
 
     _signInRetries = 0;     // a fresh attempt requested by the player
     beginSignIn();
-}
-
-void HiveService::reinitialize()
-{
-    // The terms come back with the next setup. Start from a clean state, as at the start of the game.
-    _setupReady = false;
-    resetPlayer();
-    _initRetries = 0;
-    _signInRetries = 0;
-    _hasNotice = false;
-    _afterNotice = nullptr;
-    setStatus("Hive " + _sdkVersion + ": setup...");
-    setLoginStatus(std::string());
-    beginInit();
-}
-
-void HiveService::requestResetTerms(ResultCallback done)
-{
-    const AccountKind kind = accountKind();
-    if (!_bridge || !_setupReady || _busy || (kind != AccountKind::Guest && kind != AccountKind::Linked))
-    {
-        if (done) done(false, kind == AccountKind::Unknown ? "account type unknown" : "not available");
-        return;
-    }
-
-    const bool sent = HiveAuthV4(*_bridge).resetAgreement();
-    log("[Hive] resetAgreement requested (sent=%d), account kind: %s", sent ? 1 : 0,
-        kind == AccountKind::Guest ? "guest (deleting it)" : "linked (signing out)");
-
-    // Signing out would lose a guest account for good, so a guest is deleted instead (the player agreed before).
-    _busy = true;
-    setLoginStatus(kind == AccountKind::Guest ? "Login: deleting guest account..." : "Login: signing out...");
-    auto finished = [this, done](const HiveAuthV4::SignOutResult& r) {
-        _busy = false;
-        if (r.delivered && r.result.isSuccess())
-        {
-            reinitialize();
-            if (done) done(true, std::string());
-        }
-        else
-        {
-            log("[Hive] reset terms: sign-out / deletion reply: %s", r.result.toString().c_str());
-            const std::string reason = r.delivered ? "code " + std::to_string(r.result.code) : std::string("request failed");
-            setLoginStatus("Login: reset failed (" + reason + ")");
-            if (done) done(false, reason);
-        }
-    };
-    if (kind == AccountKind::Guest)
-    {
-        HiveAuthV4(*_bridge).playerDelete(finished);
-    }
-    else
-    {
-        HiveAuthV4(*_bridge).signOut(finished);
-    }
 }
 
 // ---------------------------------------------------------------- sign-out / account deletion

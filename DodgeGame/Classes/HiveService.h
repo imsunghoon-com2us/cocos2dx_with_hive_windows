@@ -63,17 +63,6 @@ public:
     void requestSignOut(ResultCallback done);
     void requestDeleteAccount(ResultCallback done);
 
-    // Test aid (the "Reset terms" menu entry): AuthV4.resetAgreement, then sign out (a linked account) or delete the
-    // account (a guest: the caller must have asked the player first), then run the initialization (setup) again,
-    // which is what brings the terms back. The callback gets ok == true once the sign-out / deletion succeeded and
-    // the initialization has been started again (it continues on its own, with the usual failure policy). Refused
-    // (ok == false) when not signed in or when the account type is unknown (it could be a linked account that must
-    // not be deleted).
-    void requestResetTerms(ResultCallback done);
-
-    enum class AccountKind { None, Unknown, Guest, Linked };     // None: not signed in
-    AccountKind accountKind() const;
-
 private:
     enum class Stage { Init, SignIn };
 
@@ -81,7 +70,6 @@ private:
     void setStatus(const std::string& status);
     void setLoginStatus(const std::string& status);
     void beginInit();
-    void reinitialize();        // runs the initialization (setup) again after sign-out / account deletion
     void beginSignIn();
     void showSignInUi();
     void onSignInResult(const hivecocos::HiveAuthV4::SignInResult& result);

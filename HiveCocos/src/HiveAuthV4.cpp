@@ -147,13 +147,6 @@ bool HiveAuthV4::isAutoSignIn()
     return reply.ok && reply.getBool("isAutoSignIn");
 }
 
-bool HiveAuthV4::resetAgreement()
-{
-    if (!_bridge.isStarted()) return false;
-    _bridge.callSync("AuthV4", "resetAgreement");     // the reply is empty; nothing to parse
-    return true;
-}
-
 bool HiveAuthV4::terminateProcess()
 {
     return _bridge.callSync("AuthV4", "terminateProcess").ok;

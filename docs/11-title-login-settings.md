@@ -58,24 +58,14 @@ GameScene 우측 상단 [Settings]
   **같은 키의 다음 입력을 REPEAT로 처리**해 게임이 무시할 수 있다(팝업에서 Enter로 재시도한 뒤 다음 팝업의 Enter가 먹히지 않은 현상과 일치한다. 클릭으로 닫으면 문제가 없었다).
 - 원인을 코드로 끝까지 확인한 것은 아니고, 조치 뒤 같은 시나리오(Enter만으로 3번)가 통과했다. 조치: 키로 팝업을 닫거나 타이틀에서 키로 로그인을 시작하면 **0.25초 뒤에** 동작을 실행해 키 뗌이 먼저 게임에 도착하게 한다(`ModalDialog::choose`, `TitleScene::onAction`).
 
-## 약관 시험용 Reset 메뉴 (Settings -> Reset terms)
-`resetAgreement`만 부르면 약관이 다시 뜨지 않아(사용자 확인), **초기화(`setup`)를 다시 해야 약관이 뜬다**는 전제로 흐름을 바꿨다.
-- 연동 계정: `AuthV4.resetAgreement` -> 로그아웃 -> 타이틀로 이동 -> Hive 초기화(`setup`) 재실행(`HiveService::requestResetTerms`, `reinitialize`). 이후 로그인은 시작할 때처럼 자동으로 이어진다.
-- 게스트 계정: 로그아웃하면 다시 로그인할 수 없으므로 먼저 팝업("This is a guest account. Resetting the terms deletes it. This cannot be undone. Continue?", Continue/Cancel)으로 알리고,
-  Continue이면 `resetAgreement` -> **계정 삭제** -> 타이틀 -> 초기화 재실행. Cancel/Esc는 아무 일도 하지 않는다.
-- 계정 종류를 알 수 없으면(로그인 응답에 Provider 정보가 없음) 연동 계정을 지울 위험이 있어 **실행하지 않고** 안내 팝업만 띄운다. 로그인하지 않았으면 "available only while signed in".
-- 실패하면 `Reset terms failed (<사유>).` 팝업. 초기화 재실행에도 기존 실패 정책(팝업, 재시도 2회, 종료)이 적용된다.
-- **미확인**: 이미 초기화한 SDK에 `setup`을 다시 부르는 것이 허용되는지(문서에 없음), 그리고 이 흐름으로 약관이 실제로 다시 뜨는지. 로그인한 상태가 필요해 자동으로 시험하지 못했다(사용자 확인 필요).
-  게스트 확인 팝업과 계정 삭제도 실제 계정으로는 시험하지 않았다.
+## 약관 동의 상태의 저장 위치 (시험용 Reset 메뉴는 제거함)
+약관 화면이 제대로 뜨는지 시험하려고 설정 메뉴에 `Reset terms`(SDK의 `AuthV4.resetAgreement` 호출, 이어서 로그아웃/게스트는 계정 삭제 후 초기화 재실행)를 만들어 보았으나,
+**`resetAgreement`는 이 환경(Windows)에서 약관을 다시 띄우지 못했다**(로그아웃 상태에서 호출 시점을 바꿔 가며 시험, 로그인 상태에서 사용자 시험도 같았다). 약관 노출 자체는 정상임이 확인되어 메뉴와 관련 코드(어댑터 `resetAgreement`, `HiveService`의 재설정 흐름)를 모두 제거했다.
 
-초기에 구현한 "호출만 하는" 버전의 시험 결과(참고): 어댑터 `HiveAuthV4::resetAgreement()`(동기, 응답에 결과가 없어 "요청을 보냈는가"만 반환, 단위 시험 153개).
-로그인하지 않은 상태에서 이 호출을 setup 전, setup 후에 각각 넣어 보았지만 다음 실행에 약관이 다시 뜨지 않았다(`propFolder`의 파일도 그대로).
-
-약관이 **다시 뜨는 것이 확인된 방법**(2026-10-30, Release, real 존. 스냅샷으로 복원하며 시험):
-- `<exe 폴더>\propFolder\REAL_HiveProperty.dat` 삭제 또는 `propFolder` 폴더 삭제 -> 다음 실행에서 약관 표시. 게임을 실행 중에 지운 뒤 정상/강제 종료해도 파일이 다시 생기지 않아 마찬가지였다.
+시험에서 알게 된 약관 동의 저장 위치(2026-10-30, Release, real 존. 스냅샷으로 복원하며 시험)는 약관을 다시 시험할 때 쓸 수 있다:
+- `<exe 폴더>\propFolder\REAL_HiveProperty.dat` 삭제 또는 `propFolder` 폴더 삭제 -> 다음 실행에서 약관 표시. 게임을 실행 중에 지운 뒤 정상/강제 종료해도 파일이 다시 생기지 않아 마찬가지였다(사용자도 확인).
 - 이 파일은 동의 전 352 B, 동의 후 1824 B이고 실행마다 갱신된다. 파일 이름의 접두사는 zone(`REAL_`, Debug에는 `TEST_`)이다.
 - AppId 폴더(`%LOCALAPPDATA%\<AppId>`)의 `hdata.info`, `hdata2.info`, `hudata.info`, exe의 `cache` 폴더를 지워도 약관은 다시 뜨지 않았다.
-- 이전에 "AppId 파일이 약관을 좌우한다"고 한 설명은 판정 오류에서 나온 것이므로 이 문서 내용이 맞다.
 - 사용자가 겪은 "파일을 지워도 약관이 안 뜬다"는 재현하지 못했다(다른 exe 폴더의 파일을 지웠거나 로그인된 상태였을 가능성, 미확인).
 
 ## 종료 뒤 CEF 프로세스가 남는 문제 (수정)

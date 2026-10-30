@@ -9,8 +9,7 @@
 //
 //   createScene(true)   app start: starts the Hive SDK, which initializes and then signs in by itself
 //   createScene(false)  after a sign-out / account deletion: shows "press any key to sign in" and signs in only when the
-//                       player presses a key. (After "Reset terms" the Hive initialization is already running again,
-//                       so the title first shows its progress, and the sign-in follows by itself like at the start.)
+//                       player presses a key
 //
 // Failures reported by HiveService (initialization, sign-in) are shown as popups here (see HiveService.h).
 class TitleScene : public cocos2d::Layer
