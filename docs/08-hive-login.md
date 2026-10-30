@@ -6,16 +6,20 @@
 | 항목 | 결과 |
 |---|---|
 | AppId 변경 | 사용자가 지정한 Microsoft Store용 AppId로 적용(Debug, Release). 값은 커밋되지 않는 `hive.local.json`에만 있다. SDK 패키지 원본(`steam`)은 그대로 |
-| 새 AppId로 `setup` | `ready (providers 8)` (이전 `steam` AppId는 `providers 9`). 약관 동의는 유지되어 클릭 없이 3초 만에 `ready` |
+| Zone 변경 | `hive_config.xml`의 `<zone>`을 `test` -> **`real`**로 적용(Debug, Release). `setup_hive.ps1 -Zone` 또는 `hive.local.json`의 `"zone"`. SDK 패키지 원본은 `test` 그대로 |
+| `real` 존의 `setup` | **약관 동의 대기.** `test` 존과 다른 "게임 이용약관" 화면(필수 모바일 게임서비스 이용약관, 개인정보 수집 및 이용동의)이 떠서 동의 전까지 `setup` 응답이 오지 않는다(HUD `setup...`). 운영 약관이라 대신 동의하지 않았다. **`real`의 `ready`는 사용자 동의 후 확인 필요** |
+| 새 AppId로 `setup` (`test` 존) | `ready (providers 8)` (이전 `steam` AppId는 `providers 9`). 약관 동의는 유지되어 클릭 없이 3초 만에 `ready` |
 | 단위 시험 | **119개 검사 통과**(이전 87 + 로그인 32). 토큰 노출 변이 시험으로 실패를 잡아냄 |
 | `L` 키 -> Hive 로그인 UI | **확인됨.** `showSignIn` 요청 후 HUD `Login: Hive sign-in UI...`, 화면에 계정 선택 UI(Google, Hive, Apple, Facebook, X, Telegram, LINE, 게스트, "로그인 상태 유지")가 뜸. 제 시험에서는 UI에서 아무것도 선택하지 않았다 |
 | 실제 로그인 완료, 로그아웃, 자동 로그인 | **미확인 - 사용자 확인 대상**(계정 생성/로그인은 대신하지 않았다) |
 | 빌드 | x64 Debug, Release 오류 0, 우리 코드 경고 0 |
 
-## AppId 적용 방식
-SDK는 exe 옆 `Resources\hive_config.xml`을 읽는다. 샘플 설정은 `steam`이 활성이고 `microsoftstore` 등은 주석 후보로 적혀 있다.
-`tools/setup_hive.ps1`이 복사 직후 **활성 `<appId>` 한 줄만** 바꾼다(정확히 1개가 아니면 실패). 값의 우선순위:
-1. `-AppId <id>` 2. 환경 변수 `HIVE_APP_ID` 3. 저장소 루트의 `hive.local.json`(`{"appId": "..."}`, **`.gitignore`로 커밋 제외**)
+## AppId와 Zone 적용 방식
+SDK는 exe 옆 `Resources\hive_config.xml`을 읽는다. 샘플 설정은 `appId`가 `steam`으로 활성이고 `microsoftstore` 등은 주석 후보로 적혀 있으며, `zone`은 `test`다.
+`tools/setup_hive.ps1`이 복사 직후 **활성 `<appId>`, `<zone>` 한 줄씩만** 바꾼다(각각 정확히 1개가 아니면 실패). 값의 우선순위:
+- AppId: 1. `-AppId <id>` 2. 환경 변수 `HIVE_APP_ID` 3. 저장소 루트의 `hive.local.json`(`{"appId": "..."}`, **`.gitignore`로 커밋 제외**)
+- Zone: 1. `-Zone real|test|sandbox` 2. `hive.local.json`의 `"zone"`. **환경 변수 `HIVE_ZONE`은 읽지 않는다**: 게임이 런타임에 네이티브 표기(`SANDBOX`/`REAL`)로 쓰는 값이라 XML 표기(`real`/`test`)와 형식이 다르다.
+- 허용 값: SDK 샘플은 `test`, 설정 편집기(`HIVEConfigXmlEditor`)는 `real`/`sandbox`를 쓴다. Windows 설정의 zone은 자유 문자열이라 위 셋만 허용하도록 스크립트에서 검증한다.
 
 - 현재 PC에는 `hive.local.json`에 위 AppId를 넣어 두었으므로 `tools\setup_hive.ps1 -Config Debug|Release`만 실행해도 적용된다.
 - 매 실행이 샘플 설정을 다시 복사한 뒤 AppId를 덮어쓴다. AppId를 지정하지 않으면 SDK 샘플 값(`steam`)으로 돌아간다.
@@ -57,7 +61,7 @@ DodgeGame/Classes/GameScene.cpp                                  L/O 키, HUD �
 
 ## 사용자 확인 절차 (실제 로그인)
 1. `tools\build.ps1 -Config Release` (이미 빌드됨), `tools\setup_hive.ps1 -Config Release` (AppId 적용 완료).
-2. `DodgeGame\build-x64\bin\DodgeGame\Release\DodgeGame.exe` 실행. HUD에 `Hive 4.26.7.0: ready (providers 8)`와 `Login: press L to sign in`이 보이는지 확인.
+2. `DodgeGame\build-x64\bin\DodgeGame\Release\DodgeGame.exe` 실행. **zone이 `real`이므로 처음에는 "게임 이용약관" 화면이 뜬다. 직접 동의**(필수 항목 체크 후 `시작하기` 또는 `모두 동의하고 시작하기`). 이후 HUD에 `Hive 4.26.7.0: ready (providers N)`와 `Login: press L to sign in`이 보이는지 확인. (`providers` 개수가 `test` 존의 8과 다를 수 있다.)
 3. `L`을 눌러 계정 선택 UI에서 로그인(예: 게스트). 성공하면 HUD가 `Login: signed in (player N...)`로 바뀐다.
 4. `O`로 로그아웃 -> `Login: signed out - press L to sign in`.
 5. 로그인한 뒤 게임을 껐다 켜서 `isAutoSignIn` 자동 로그인(`Login: auto sign-in...` -> `signed in`)이 되는지 확인.
