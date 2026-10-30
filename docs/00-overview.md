@@ -46,6 +46,7 @@ cocos2dx_with_hive_windows/
 | 6 | Hive SDK 연동 (초기화 + 설정). 브랜치 `phase6/hive-sdk-init` | `docs/06-hive-sdk-integration.md`, `HiveCocos/`, `tools/setup_hive.ps1` | `getHiveSDKVersion` 응답, `setup` 응답, cdb로 요청 JSON 확인, DLL 없을 때 오류 처리 |
 | 7 | 엔진 패치의 x86 분기 정리(x64 전용, `COCOS_USE_*` 기본 OFF). 브랜치 `phase7/engine-patch-cleanup` | `tools/patches/engine-3.17.2-x64/`, `docs/05-x64-migration.md`의 "Phase 7" 절 | 새 패치가 원본에 적용돼 편집본과 바이트 일치, 플래그 없는 새 configure로 같은 구성, x64 빌드·시험·SDK 실행 |
 | 8 | Hive 로그인과 AppId. 브랜치 `phase8/hive-login` | `docs/08-hive-login.md`, `HiveCocos`의 `signIn`/`showSignIn`/`signOut`, `setup_hive.ps1 -AppId`, `hive.local.json` | 단위 시험, `L` 키로 로그인 UI 표시, **사용자 확인: 실제 로그인/로그아웃/자동 로그인** |
+| 9 | 다운로드 소스 SHA256 고정(19개, Hive SDK 제외). 브랜치 `phase9/sha256-pinning` | `docs/09-handoff.md`(계획과 인계), 구현 후 별도 문서 | 정상 통과, 변조 시 명확한 오류로 중단(부정 시험), 빌드·시험 회귀 없음 |
 
 Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작이 확인된 뒤에만 `main`에 `--no-ff`로 병합한다.
 
@@ -61,5 +62,6 @@ Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작
 - [x] Phase 6: Hive SDK 연동 — 초기화 + 설정 (브랜치 `phase6/hive-sdk-init`). 실제 SDK로 `setup` 응답 확인(HUD `Hive 4.26.7.0: ready (providers 9)`). x86 지원 제거(x64 전용). `main` 병합 완료
 - [x] Phase 7: 엔진 패치 x86 분기 정리 (브랜치 `phase7/engine-patch-cleanup`, `main` 병합 완료)
 - [x] Phase 8: Hive 로그인과 AppId (브랜치 `phase8/hive-login`, `main` 병합 완료). 구현·단위 시험(119개)·로그인 UI 표시 확인, `real` 존 약관 동의 후 **사용자가 로그인 동작 확인**. 로그아웃/자동 로그인/한글 입력(IME)은 확인 결과 미전달(`docs/08` 참고)
+- [ ] Phase 9: 다운로드 소스 SHA256 고정 (브랜치 `phase9/sha256-pinning`). **다음 작업. 계획과 인계는 `docs/09-handoff.md`**
 
 Phase 5부터 빌드는 x64 전용이다. `docs/01~04`는 Win32 시절의 기록이므로 해당 명령(`-Arch` 없이 Win32 빌드 등)은 더 이상 유효하지 않다. 현재 규칙은 `CLAUDE.md`를 따른다.
