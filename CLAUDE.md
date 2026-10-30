@@ -15,7 +15,8 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 - x64 라이브러리 빌드: `tools/build_deps_x64.ps1` (약 25분, 이미 있으면 건너뜀. `-Only`, `-Force`)
 - 빌드: `tools/build.ps1 -Config Debug|Release [-Arch Win32|x64]` (산출물 `DodgeGame\build` / `DodgeGame\build-x64`)
 - 디버깅: Win32는 `...\Debuggers\x86\cdb.exe`, x64는 `C:\Program Files\Windows Kits\10\Debuggers\x64\cdb.exe`
-  (`-G`로 실행, `-g`는 `-c` 명령이 초기 중단에서 실행되므로 쓰지 않는다). x64에서 `this`는 `@rcx`(x86은 `@ecx`).
+  (`-G`로 실행. `-c "..."` 스크립트를 쓸 때는 `-g`를 쓰지 않는다: `-c`가 초기 중단에서 실행되기 때문. 대화형 디버깅은 `-g -G`도 된다).
+  x64에서 `this`는 `@rcx`(x86은 `@ecx`).
 
 ## 디렉터리 규칙
 - `DodgeGame/cocos2d/`는 엔진 junction이며 git에서 제외된다. **직접 수정하지 않는다.**

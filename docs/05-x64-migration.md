@@ -15,7 +15,8 @@ cocos2d-x 3.17.2는 Win32(x86)로만 빌드되어 있었으므로 엔진과 게�
 | 회귀 시험(이동, 마우스, 게임오버, Space·클릭 재시작) | x64에서 통과 (A 139, D 241, 마우스 407) |
 | 재시작 지연(cdb, x64) | `_gameOverElapsed` = 0.550 (>= 0.5) |
 | `CC_LITTLE_ENDIAN` 수정 효과 | x64 원본 0(불일치) -> 패치 후 1(일치), 실측 |
-| 새 clone 재현 | 아래 "재현 시험" 참고 |
+| Win32 Release 빌드 (패치된 엔진) | 성공, exe machine=14C(x86), 네트워크 DLL 포함, 실행 정상 |
+| 새 clone 재현 | 성공 (아래 "재현 시험") |
 
 ## 구성
 ### 1. 엔진은 패치로 관리 (`tools/patches/engine-3.17.2-x64/`)
@@ -70,6 +71,31 @@ zlib, sqlite3, GLEW, OpenAL, mpg123, ogg/vorbis, iconv는 API 호환되는 더 �
 - `tools/build.ps1 -Arch Win32|x64`: 빌드 폴더 분리(`build`/`build-x64`), x64는 위 두 옵션을 자동 지정. `UCRTContentRoot` 우회는 그대로.
 - `tools/check_env.ps1`: `MSVC v141 x64`(`HostX64\x64\cl.exe`), `UCRT x64` 점검 추가.
 - `.gitignore`: `HiveSDKv4_unreal/`, `DodgeGame/build-x64/` 추가(이 브랜치의 첫 커밋).
+
+## 재현 시험 (새 clone)
+`git clone -b phase5/x64-migration`한 빈 폴더에서 저장소 스크립트만으로 처음부터 빌드했다.
+
+| 단계 | 결과 | 소요 |
+|---|---|---|
+| `setup_engine.ps1` | 엔진 다운로드, 서브모듈 2개, 외부 라이브러리, **패치 3개 적용**, junction | 101초 |
+| `build_deps_x64.ps1` 1차(작업 폴더 캐시 있음) | 15개 OK | 32초 |
+| `build.ps1 -Config Debug -Arch x64` | exit 0, exe 생성 | 63초 |
+| **`build_deps_x64.ps1 -Force -WorkRoot <새 폴더>` (콜드)** | **15개 OK** | **473초(약 8분)** |
+| 콜드 라이브러리로 x64 Debug 재링크 | exit 0, exe 실행(창 `DodgeGame`) | 10초 |
+
+- **1차의 32초는 재현이 아니다.** 고정 경로의 작업 폴더(`C:\Project\cocos2d-deps-x64`)에 에이전트가 남긴 소스·빌드 캐시를 재사용한 것이라, 캐시 없는 빌드는 콜드 시험으로 따로 검증했다.
+  이 때문에 `-WorkRoot` 기본값을 저장소 옆 폴더로 바꿨다(체크아웃마다 캐시가 섞이지 않게).
+- 콜드 결과 검증: 26개 파일 전부 x64, 25개가 콜드 시작 이후 새로 생성됨. 예외 `libmpg123.dll`은 컴파일 대신 공식 바이너리를 복사하는 항목이라 `-Force`에도 다시 쓰이지 않는다.
+- 첫 빌드와 비교해 DLL은 전부 같은 크기, 정적 라이브러리 8개는 수십~수백 바이트(<0.3%) 차이가 있다. 작업 폴더 경로가 달라 `.lib`에 들어가는 경로 문자열이 달라진 것으로 보이나 확인하지는 않았다.
+- 콜드 라이브러리로 만든 exe는 실행 확인만 했고 이동·충돌·재시작 회귀 시험은 첫 빌드 라이브러리 기준으로 수행했다.
+- 서브에이전트의 첫 빌드 보고와 콜드 결과가 일치하므로 스크립트는 처음부터 재현 가능하다고 판단한다.
+
+## `tools/` 스크립트 소실 현상 (원인 불명, 3회)
+Phase 2에서 1회, Phase 5에서 서브에이전트 작업 중 `build_deps_x64.ps1`이 1회 사라졌다(복구). 보안 솔루션이 격리했을 가능성을 읽기 전용으로 확인했다.
+- Windows Defender: 우리 파일에 대한 탐지 없음(이 PC의 관련 기록은 Symantec 내부 파일뿐).
+- Symantec 이벤트(최근 3일 394건)에 우리 파일명(`setup_engine`, `build_deps`, `.ps1`, `cocos2dx_with_hive`, `HiveSDK`, `DodgeGame`)을 언급한 항목은 **0건**. 탐지 이름은 `ACM.Ps-Base64`, `ACM.Ps-Reg`, `ACM.Icacls-Lnch` 등 일반 행위 규칙이다.
+- 격리 목록과 Defender 제외 목록은 관리자 권한이 필요해 확인하지 못했다. **원인은 확정하지 못했다.**
+- 대응: 커밋 전에 `tools/` 파일 존재를 직접 확인한다(이번 단계에서도 그렇게 했다).
 
 ## x64 디버깅 (cdb)
 - x86 cdb는 x64 프로세스를 디버깅할 수 없다. `C:\Program Files\Windows Kits\10\Debuggers\x64\cdb.exe`를 쓴다.
