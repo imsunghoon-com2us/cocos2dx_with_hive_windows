@@ -310,6 +310,79 @@ static void testResultApi()
     CHECK_EQ(r.latencyMs, int64_t(5000000000LL));                            // 64-bit latency
 }
 
+static void testSignInSignOut()
+{
+    std::printf("sign in / show sign in / sign out\n");
+    Fixture f;
+    HiveAuthV4 auth(f.bridge);
+
+    HiveAuthV4::SignInResult in1, in2;
+    HiveAuthV4::SignOutResult out;
+    int calls = 0;
+    auth.signIn("GUEST", [&](const HiveAuthV4::SignInResult& r) { ++calls; in1 = r; });
+    auth.showSignIn([&](const HiveAuthV4::SignInResult& r) { ++calls; in2 = r; });
+    auth.signOut([&](const HiveAuthV4::SignOutResult& r) { ++calls; out = r; });
+
+    auto reqs = f.fake->requests();
+    CHECK_EQ(reqs.size(), size_t(3));
+    rapidjson::Document r0 = parseJson(reqs[0]), r1 = parseJson(reqs[1]), r2 = parseJson(reqs[2]);
+    CHECK_EQ(std::string(r0["method"].GetString()), std::string("signIn"));
+    CHECK_EQ(std::string(r0["providerType"].GetString()), std::string("GUEST"));     // parameter key per the SDK source
+    CHECK_EQ(std::string(r1["method"].GetString()), std::string("showSignIn"));
+    CHECK(!r1.HasMember("providerType"));
+    CHECK_EQ(std::string(r2["method"].GetString()), std::string("signOut"));
+    CHECK_EQ(std::string(r2["class"].GetString()), std::string("AuthV4"));
+    CHECK(r0["handlerId"].GetInt() >= 1 && r1["handlerId"].GetInt() >= 1 && r2["handlerId"].GetInt() >= 1);
+
+    // Successful sign-in (playerId does not fit in 32 bits), answered out of order and from another thread.
+    f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(r2["handlerId"].GetInt()) +
+        ",\"resultAPI\":{\"errorCode\":0,\"code\":0}}");
+    f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(r1["handlerId"].GetInt()) +
+        ",\"resultAPI\":{\"errorCode\":-1,\"code\":-1200101,\"errorMessage\":\"user cancelled\"}}");
+    f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(r0["handlerId"].GetInt()) +
+        ",\"resultAPI\":{\"errorCode\":0,\"code\":0},\"playerInfo\":{\"playerId\":5000000123,\"playerName\":\"tester\","
+        "\"playerImageUrl\":\"http://x/y.png\",\"playerToken\":\"SECRET-PLAYER-TOKEN\",\"accessToken\":\"SECRET-ACCESS-TOKEN\","
+        "\"did\":\"987654321\",\"isNewUser\":true}}");
+    CHECK_EQ(calls, 0);
+    f.queue.drain();
+    CHECK_EQ(calls, 3);
+
+    CHECK(in1.delivered);
+    CHECK(in1.result.isSuccess());
+    CHECK_EQ(in1.playerInfo.playerId, int64_t(5000000123LL));
+    CHECK_EQ(in1.playerInfo.playerName, std::string("tester"));
+    CHECK_EQ(in1.playerInfo.did, std::string("987654321"));
+    CHECK(in1.playerInfo.isNewUser);
+    CHECK_EQ(in1.playerInfo.playerToken, std::string("SECRET-PLAYER-TOKEN"));      // available to the game ...
+    CHECK_EQ(in1.playerInfo.accessToken, std::string("SECRET-ACCESS-TOKEN"));
+    const std::string logged = in1.playerInfo.toString();
+    CHECK(logged.find("SECRET") == std::string::npos);                              // ... but never in log output
+    CHECK(logged.find("5000000123") != std::string::npos);
+
+    CHECK(in2.delivered);                                                            // failure keeps the error details
+    CHECK(!in2.result.isSuccess());
+    CHECK_EQ(in2.result.code, -1200101);
+    CHECK_EQ(in2.result.errorMessage, std::string("user cancelled"));
+    CHECK_EQ(in2.playerInfo.playerId, int64_t(0));
+    CHECK(in2.playerInfo.playerToken.empty());
+
+    CHECK(out.delivered);
+    CHECK(out.result.isSuccess());
+
+    // Without a started bridge the callbacks still fire (delivered == false) instead of being lost.
+    auto fake2 = std::make_shared<FakeTransport>();
+    HiveBridge notStarted(fake2, nullptr);
+    HiveAuthV4 auth2(notStarted);
+    int fired = 0;
+    bool anyDelivered = false;
+    auth2.signIn("GUEST", [&](const HiveAuthV4::SignInResult& r) { ++fired; anyDelivered |= r.delivered; });
+    auth2.showSignIn([&](const HiveAuthV4::SignInResult& r) { ++fired; anyDelivered |= r.delivered; });
+    auth2.signOut([&](const HiveAuthV4::SignOutResult& r) { ++fired; anyDelivered |= r.delivered; });
+    CHECK_EQ(fired, 3);
+    CHECK(!anyDelivered);
+    CHECK_EQ(fake2->requests().size(), size_t(0));
+}
+
 static void testDllTransportMissing()
 {
     std::printf("DllTransport (missing DLL)\n");
@@ -340,6 +413,7 @@ int main()
     testEvents();
     testNotStartedAndFailures();
     testResultApi();
+    testSignInSignOut();
     testDllTransportMissing();
 
     std::printf("\n%d checks, %d failed\n", g_checks, g_failures);

@@ -58,6 +58,8 @@ private:
     cocos2d::Label* _bestLabel = nullptr;
     cocos2d::Label* _hiveLabel = nullptr;     // Hive SDK 상태 한 줄 (Windows 빌드에서만 사용)
     std::string _hiveStatusShown;
+    cocos2d::Label* _loginLabel = nullptr;    // Hive 로그인 상태 한 줄 (Windows 빌드에서만 사용)
+    std::string _loginStatusShown;
     cocos2d::Node* _gameOverPanel = nullptr;
     std::vector<Obstacle> _obstacles;
 

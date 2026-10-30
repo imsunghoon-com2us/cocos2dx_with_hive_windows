@@ -1,5 +1,9 @@
 ﻿# Copies the Hive SDK (Windows, x64) runtime next to DodgeGame.exe. Safe to re-run: only changed files are copied.
-#   tools\setup_hive.ps1 [-Config Debug|Release] [-HiveRoot <dir>] [-Target <dir>]
+#   tools\setup_hive.ps1 [-Config Debug|Release] [-HiveRoot <dir>] [-Target <dir>] [-AppId <id>]
+#
+# AppId: written into <exe dir>\Resources\hive_config.xml after the copy (the SDK package itself is never modified).
+#   Resolution order: -AppId, env HIVE_APP_ID, "appId" in <repo>\hive.local.json (git-ignored). If none is set the SDK
+#   sample value is kept. Every run re-copies the sample config first, so the value is applied again each time.
 #
 # Layout (mirrors HiveSDKWindows.Build.cs of the Unreal plugin):
 #   assets\additional\**              -> <exe dir>\**           (sub folders kept, "hercules" excluded)
@@ -11,12 +15,20 @@
 param(
     [ValidateSet('Debug', 'Release')][string]$Config = 'Debug',
     [string]$HiveRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) 'HiveSDKv4_unreal'),
-    [string]$Target
+    [string]$Target,
+    [string]$AppId
 )
 $ErrorActionPreference = 'Stop'
 
 $RepoRoot = Split-Path $PSScriptRoot -Parent
 if (-not $Target) { $Target = Join-Path $RepoRoot "DodgeGame\build-x64\bin\DodgeGame\$Config" }
+
+if (-not $AppId) { $AppId = $env:HIVE_APP_ID }
+if (-not $AppId) {
+    $localSettings = Join-Path $RepoRoot 'hive.local.json'
+    if (Test-Path $localSettings) { $AppId = [string](Get-Content $localSettings -Raw | ConvertFrom-Json).appId }
+}
+if ($AppId -and $AppId -notmatch '^[A-Za-z0-9._-]+$') { throw "invalid AppId (allowed: letters, digits, . _ -): $AppId" }
 
 if (-not (Test-Path $HiveRoot)) { throw "Hive SDK package not found: $HiveRoot (use -HiveRoot)" }
 if (-not (Test-Path (Join-Path $Target 'DodgeGame.exe'))) {
@@ -48,6 +60,20 @@ $additional = Join-Path $assets 'additional'
 Sync-Dir $additional $Target @('/XD', 'hercules')
 Sync-Dir (Join-Path $additional 'hivePlugins\hercules') $Target @()
 Sync-Dir (Join-Path $assets 'config') (Join-Path $Target 'Resources') @()
+
+# Apply the AppId to the copied config: only the active <appId> line is replaced (commented alternatives start with "<!--").
+if ($AppId) {
+    $cfgPath = Join-Path $Target 'Resources\hive_config.xml'
+    if (-not (Test-Path $cfgPath)) { throw "hive_config.xml missing after copy: $cfgPath" }
+    $bytes = [IO.File]::ReadAllBytes($cfgPath)
+    $hasBom = ($bytes.Length -ge 3 -and $bytes[0] -eq 0xEF -and $bytes[1] -eq 0xBB -and $bytes[2] -eq 0xBF)
+    $xml = [Text.Encoding]::UTF8.GetString($bytes, $(if ($hasBom) { 3 } else { 0 }), $bytes.Length - $(if ($hasBom) { 3 } else { 0 }))
+    $re = '(?m)^(\s*<appId>)[^<]*(</appId>)'
+    if ([regex]::Matches($xml, $re).Count -ne 1) { throw "expected exactly one active <appId> in $cfgPath" }
+    $xml = [regex]::Replace($xml, $re, ('${1}' + $AppId + '${2}'))
+    [IO.File]::WriteAllText($cfgPath, $xml, (New-Object Text.UTF8Encoding($hasBom)))
+    Write-Host "AppId      : $AppId (applied to Resources\hive_config.xml)"
+}
 
 # Verify the essentials and that the entry DLL is x64.
 $dll = Join-Path $Target 'HIVE_PLUGIN_CPP.dll'

@@ -15,7 +15,10 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 - 엔진 복원: `tools/setup_engine.ps1` (엔진 다운로드, **x64 패치 적용**, `DodgeGame\cocos2d` junction 생성)
 - x64 라이브러리 빌드: `tools/build_deps_x64.ps1` (약 25분, 이미 있으면 건너뜀. `-Only`, `-Force`)
 - 빌드: `tools/build.ps1 -Config Debug|Release [-Clean]` (산출물 `DodgeGame\build-x64`)
-- Hive SDK 런타임 배치: `tools/setup_hive.ps1 -Config Debug|Release` (변경분만 복사, 구성당 약 740MB).
+- Hive SDK 런타임 배치: `tools/setup_hive.ps1 -Config Debug|Release [-AppId <id>]` (변경분만 복사, 구성당 약 740MB).
+  AppId는 `-AppId` > 환경 변수 `HIVE_APP_ID` > 저장소 루트 `hive.local.json`(`{"appId":"..."}`, git 제외) 순으로 적용되며,
+  없으면 SDK 샘플 값(`steam`)이다. 매 실행이 샘플 설정을 다시 복사한 뒤 AppId를 덮어쓴다.
+  게임 키: `L` Hive 로그인 UI, `O` 로그아웃(로그인 UI가 떠 있는 동안에는 게임 키 입력을 무시한다).
   SDK의 이용약관 동의는 사람이 직접 해야 한다(동의 전에는 `setup` 응답이 오지 않고 HUD가 `setup...`에 머문다).
   관찰상 **구성(exe 폴더)마다 처음 한 번** 필요했다: Release에서 동의한 뒤 같은 Release 폴더의 새 인스턴스는 3초 만에 `ready`가 됐지만,
   Debug 폴더에서는 약관이 다시 떴다(저장 위치는 확인하지 못했다).
