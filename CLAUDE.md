@@ -55,7 +55,7 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 - 커밋 메시지는 `[Phase N] 요약` 형식으로 쓰고, 단계가 끝나면 `git push` 한다.
 - **Phase 5부터는 단계별 브랜치**(`phase5/x64-migration`, `phase6/hive-sdk-init`)에 커밋·푸시한다. `main`은 모든 단계가 끝나고
   정상 동작이 확인된 뒤에만 `--no-ff`로 병합한다. 병합 전에 충돌, `git status`, 민감 파일 미포함을 확인한다.
-- 저장소는 public으로 전환할 예정이다(현재 private). 토큰, 자격 증명, 개인정보를 커밋하지 않는다. 커밋 전에 `git diff --cached`로 확인한다.
+- 저장소는 **public**이다(2026-10-30 전환, 이전에는 private). 토큰, 자격 증명, 개인정보를 커밋하지 않는다. 커밋 전에 `git diff --cached`로 확인한다.
 - 문서와 대화는 한국어로 쓴다.
 
 ## 인계 (새 세션은 먼저 읽을 것)

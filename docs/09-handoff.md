@@ -85,7 +85,8 @@ GitHub private 저장소 `imsunghoon-com2us/cocos2dx_with_hive_windows`. 문서�
 - 커밋 전: `git status`, 경로 지정 스테이징, 비밀 스캔, `tools/` 파일 존재 확인. 병합은 사용자 확인 후 `--no-ff`.
 
 ## 6. 그 밖의 남은 작업 (우선순위는 사용자와 협의)
-1. **public 전환 체크리스트**: SHA256 고정, 커밋 작성자 이메일(`imsunghoon@com2us.com`)이 공개 이력에 남는 점의 확인과 결정, README 정리, 저장소 공개 설정.
+1. ~~**public 전환 체크리스트**~~: **2026-10-30에 저장소를 public으로 전환했다.** SHA256 고정은 끝났고, 이력 전체(35개 커밋)에 민감 파일/비밀 값이 없음을 확인했다.
+   **커밋 작성자 이메일(`imsunghoon@com2us.com`, 회사 주소)이 35개 커밋 모두에 공개 이력으로 남아 있다**(전환 전에 사용자에게 따로 확인하지 못했다). 이메일을 가리려면 저장소를 다시 private으로 돌리거나 이력을 noreply 주소로 다시 쓰는(강제 푸시) 결정이 필요하다. README 정리와 LICENSE는 아직 없다.
 2. 로그인 미확인 항목: 로그아웃(`O`), 자동 로그인(`isAutoSignIn`; 최근 자동 로그인이 안 된 것은 오류가 아니라 "로그인 상태 유지" 선택 여부일 가능성이 있으나 미확인),
    **한글/키보드 입력(IME)**: UE는 `showSignIn` 전후로 CEF IME 함수(`HIVESDKCEFImeEnable/Disable`, HIVEUIFramework의 `setImeProcess` 등)를 호출하는데 이 어댑터는 호출하지 않는다. 입력창이 안 되면 연동이 필요하다.
 3. 결제(IAP) 연동: `IAPV4` 클래스(SDK 소스 `HiveIAPV4Impl.cpp` 참고). Microsoft Store AppId와 `<market>` 값의 조합 확인이 필요하다.
