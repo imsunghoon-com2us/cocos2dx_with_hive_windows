@@ -1,5 +1,7 @@
 # 02. 엔진 준비, 프로젝트 생성, 템플릿 빌드 (Phase 2)
 
+> 참고: 이 문서는 Win32(x86) 시절의 기록이다. Phase 6부터 빌드는 x64 전용이며(`tools\build.ps1`은 `-Arch`를 받지 않는다), 현재 명령과 규칙은 `CLAUDE.md`를 따른다.
+
 ## 결과
 - cocos2d-x 3.17.2 엔진을 복원하고 `DodgeGame`(cpp 템플릿, HelloWorld)을 생성했다.
 - `tools\build.ps1 -Config Debug|Release`로 Win32 빌드에 성공했고, 두 exe 모두 창(`DodgeGame`)이 뜨고 5초간 정상 실행됨을 확인했다.

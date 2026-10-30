@@ -1,0 +1,347 @@
+// Console tests for the cocos-free core of HiveCocos. Exit code 0 = all passed.
+#include "HiveCocos/DllTransport.h"
+#include "HiveCocos/FakeTransport.h"
+#include "HiveCocos/HiveAuthV4.h"
+#include "HiveCocos/HiveBridge.h"
+#include "HiveCocos/HiveConfiguration.h"
+
+#include <cstdio>
+#include <deque>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+
+using namespace hivecocos;
+
+static int g_checks = 0;
+static int g_failures = 0;
+
+#define CHECK(cond)                                                                     \
+    do {                                                                                \
+        ++g_checks;                                                                     \
+        if (!(cond)) { ++g_failures; std::printf("  FAIL %s:%d  %s\n", __FILE__, __LINE__, #cond); } \
+    } while (0)
+
+#define CHECK_EQ(a, b)                                                                  \
+    do {                                                                                \
+        ++g_checks;                                                                     \
+        const auto va = (a); const auto vb = (b);                                       \
+        if (!(va == vb)) { ++g_failures; std::printf("  FAIL %s:%d  %s == %s\n", __FILE__, __LINE__, #a, #b); } \
+    } while (0)
+
+// A dispatcher that queues work; the test thread plays the part of the cocos thread.
+struct MainQueue
+{
+    std::mutex m;
+    std::deque<std::function<void()>> q;
+    HiveBridge::Dispatcher dispatcher()
+    {
+        return [this](std::function<void()> fn) { std::lock_guard<std::mutex> l(m); q.push_back(std::move(fn)); };
+    }
+    size_t pending() { std::lock_guard<std::mutex> l(m); return q.size(); }
+    void drain()
+    {
+        for (;;)
+        {
+            std::function<void()> fn;
+            { std::lock_guard<std::mutex> l(m); if (q.empty()) return; fn = std::move(q.front()); q.pop_front(); }
+            fn();
+        }
+    }
+};
+
+static rapidjson::Document parseJson(const std::string& s)
+{
+    rapidjson::Document d;
+    d.Parse(s.c_str());
+    return d;
+}
+
+struct Fixture
+{
+    std::shared_ptr<FakeTransport> fake = std::make_shared<FakeTransport>();
+    MainQueue queue;
+    HiveBridge bridge;
+    explicit Fixture(HiveBridge::Options o = HiveBridge::Options()) : bridge(fake, queue.dispatcher(), o)
+    {
+        std::string err;
+        const bool started = bridge.start(&err);
+        CHECK(started);
+    }
+};
+
+static void testRequestFormat()
+{
+    std::printf("request format\n");
+    HiveBridge::Options o;
+    std::string s = HiveBridge::buildRequest("Configuration", "setAppId", 7, o, { { "setAppId", "com.example.app" } });
+    rapidjson::Document d = parseJson(s);
+    CHECK(d.IsObject());
+    CHECK_EQ(std::string(d["class"].GetString()), std::string("Configuration"));
+    CHECK_EQ(std::string(d["method"].GetString()), std::string("setAppId"));
+    CHECK_EQ(d["handlerId"].GetInt(), 7);
+    CHECK_EQ(std::string(d["platform"].GetString()), std::string("cpp"));
+    CHECK(!d.HasMember("engine"));                       // omitted unless configured
+    CHECK_EQ(std::string(d["setAppId"].GetString()), std::string("com.example.app"));   // flat params
+
+    o.engine = "Cocos2dx";
+    o.platform = "windows";
+    d = parseJson(HiveBridge::buildRequest("AuthV4", "setup", 1, o, {}));
+    CHECK_EQ(std::string(d["engine"].GetString()), std::string("Cocos2dx"));
+    CHECK_EQ(std::string(d["platform"].GetString()), std::string("windows"));
+
+    s = HiveBridge::buildRequest("Configuration", "setHttpConnectTimeout", -1, HiveBridge::Options(),
+                                 { { "setHttpConnectTimeout", 5 }, { "setUseLog", true }, { "ratio", 0.5 } });
+    CHECK(s.find("\"setHttpConnectTimeout\":5,") != std::string::npos);   // "5", not "5.0"
+    CHECK(s.find("5.0") == std::string::npos);
+    CHECK(s.find("\"setUseLog\":true") != std::string::npos);
+    CHECK(s.find("\"ratio\":0.5") != std::string::npos);
+
+    // UTF-8 and escaping survive a round trip.
+    const std::string tricky = u8"\uD55C\uAE00 \"quote\" \\ back\nline";
+    d = parseJson(HiveBridge::buildRequest("X", "y", 1, HiveBridge::Options(), { { "v", tricky } }));
+    CHECK(d.IsObject());
+    CHECK_EQ(std::string(d["v"].GetString()), tricky);
+}
+
+static void testConfigurationSync()
+{
+    std::printf("configuration (sync)\n");
+    Fixture f;
+    f.fake->setResponder([](const std::string& req) -> std::string {
+        rapidjson::Document d = parseJson(req);
+        const std::string m = d["method"].GetString();
+        if (m == "getHiveSDKVersion") return "{\"getHiveSDKVersion\":\"26.7.0\"}";
+        if (m == "getZone") return "{\"getZone\":\"SANDBOX\"}";
+        if (m == "getAppId") return "{\"getAppId\":\"com.example.app\"}";
+        return "{}";
+    });
+    HiveConfiguration cfg(f.bridge);
+    CHECK_EQ(cfg.getHiveSDKVersion(), std::string("26.7.0"));
+    CHECK(cfg.getZone() == HiveZone::Sandbox);
+    CHECK_EQ(cfg.getAppId(), std::string("com.example.app"));
+
+    CHECK(cfg.setAppId("com.example.app"));
+    CHECK(cfg.setZone(HiveZone::Real));
+    CHECK(cfg.setServerId("KR"));
+    CHECK(cfg.setGameLanguage("ko"));
+    CHECK(cfg.setUseLog(true));
+    CHECK(cfg.setHiveCertificationKey("KEY"));
+
+    auto reqs = f.fake->requests();
+    CHECK_EQ(reqs.size(), size_t(9));
+    rapidjson::Document last = parseJson(reqs.back());
+    CHECK_EQ(std::string(last["method"].GetString()), std::string("setHiveCertificationKey"));
+    CHECK_EQ(std::string(last["appKey"].GetString()), std::string("KEY"));    // key differs from the method name
+    CHECK_EQ(last["handlerId"].GetInt(), -1);                                  // sync calls carry no handler
+    rapidjson::Document zone = parseJson(reqs[4]);
+    CHECK_EQ(std::string(zone["setZone"].GetString()), std::string("REAL"));
+}
+
+static void testSyncFailures()
+{
+    std::printf("sync failures\n");
+    Fixture f;
+    HiveConfiguration cfg(f.bridge);
+
+    f.fake->setResponder([](const std::string&) { return std::string(); });          // native returned nothing
+    HiveResponse r = f.bridge.callSync("Configuration", "getAppId");
+    CHECK(!r.ok);
+    CHECK_EQ(cfg.getAppId(), std::string());
+
+    f.fake->setResponder([](const std::string&) { return std::string("not json{"); });
+    r = f.bridge.callSync("Configuration", "getAppId");
+    CHECK(!r.ok);
+    CHECK(!cfg.setAppId("x"));
+
+    f.fake->setResponder([](const std::string&) { return std::string("[1,2]"); });    // valid JSON, wrong shape
+    CHECK(!f.bridge.callSync("a", "b").ok);
+}
+
+static void testAsyncMatchingAndThreading()
+{
+    std::printf("async matching and threading\n");
+    Fixture f;
+    HiveAuthV4 auth(f.bridge);
+
+    int calls = 0;
+    std::thread::id handlerThread;
+    HiveAuthV4::SetupResult got;
+    auth.setup([&](const HiveAuthV4::SetupResult& r) { ++calls; handlerThread = std::this_thread::get_id(); got = r; });
+
+    auto reqs = f.fake->requests();
+    CHECK_EQ(reqs.size(), size_t(1));
+    rapidjson::Document req = parseJson(reqs[0]);
+    CHECK_EQ(std::string(req["class"].GetString()), std::string("AuthV4"));
+    CHECK_EQ(std::string(req["method"].GetString()), std::string("setup"));
+    const int id = req["handlerId"].GetInt();
+    CHECK_EQ(id, 1);                                                                   // ids start at 1
+
+    // The SDK answers from its own thread.
+    f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(id) +
+        ",\"resultAPI\":{\"errorCode\":0,\"code\":0,\"errorMessage\":\"\",\"message\":\"success\",\"latencyMs\":42},"
+        "\"isAutoSignIn\":true,\"did\":\"123456789\",\"providerTypeList\":[\"GOOGLE\",\"GUEST\"]}");
+    CHECK_EQ(calls, 0);                                         // not run on the SDK thread
+    CHECK_EQ(f.queue.pending(), size_t(1));
+    f.queue.drain();
+    CHECK_EQ(calls, 1);
+    CHECK(handlerThread == std::this_thread::get_id());         // ran where drain() ran ("cocos thread")
+    CHECK(got.delivered);
+    CHECK(got.result.isSuccess());
+    CHECK_EQ(got.result.latencyMs, int64_t(42));
+    CHECK(got.isAutoSignIn);
+    CHECK_EQ(got.did, std::string("123456789"));
+    CHECK_EQ(got.providerTypeList.size(), size_t(2));
+    CHECK_EQ(got.providerTypeList[1], std::string("GUEST"));
+
+    // A reply is delivered once: a duplicate and an unknown handlerId are ignored.
+    f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(id) + ",\"did\":\"dup\"}");
+    f.fake->emitFromOtherThread("{\"handlerId\":999,\"did\":\"unknown\"}");
+    f.queue.drain();
+    CHECK_EQ(calls, 1);
+}
+
+static void testOutOfOrderReplies()
+{
+    std::printf("out-of-order replies\n");
+    Fixture f;
+    std::string a, b;
+    f.bridge.callAsync("X", "first", {}, [&](const HiveResponse& r) { a = r.getString("v"); });
+    f.bridge.callAsync("X", "second", {}, [&](const HiveResponse& r) { b = r.getString("v"); });
+    auto reqs = f.fake->requests();
+    const int idA = parseJson(reqs[0])["handlerId"].GetInt();
+    const int idB = parseJson(reqs[1])["handlerId"].GetInt();
+    CHECK(idA != idB);
+    CHECK(idA >= 1 && idB >= 1);
+
+    f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(idB) + ",\"v\":\"B\"}");
+    f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(idA) + ",\"v\":\"A\"}");
+    f.queue.drain();
+    CHECK_EQ(a, std::string("A"));
+    CHECK_EQ(b, std::string("B"));
+}
+
+static void testEvents()
+{
+    std::printf("events\n");
+    Fixture f;
+    int plain = 0, keyed = 0;
+    f.bridge.setEventListener("AuthV4:onSignIn", [&](const HiveResponse&) { ++plain; });
+    f.bridge.setEventListener("AuthV4:onSignIn:abc", [&](const HiveResponse&) { ++keyed; });
+
+    f.fake->emitFromOtherThread("{\"class\":\"AuthV4\",\"method\":\"onSignIn\"}");
+    f.fake->emitFromOtherThread("{\"class\":\"AuthV4\",\"method\":\"onSignIn\",\"uniqueKey\":\"abc\"}");
+    f.fake->emitFromOtherThread("{\"class\":\"AuthV4\",\"method\":\"unknown\"}");       // no listener: ignored
+    f.fake->emitFromOtherThread("{\"nothing\":1}");                                      // neither handler nor event
+    f.queue.drain();
+    CHECK_EQ(plain, 1);
+    CHECK_EQ(keyed, 1);
+
+    f.bridge.removeEventListener("AuthV4:onSignIn");
+    f.fake->emitFromOtherThread("{\"class\":\"AuthV4\",\"method\":\"onSignIn\"}");
+    f.queue.drain();
+    CHECK_EQ(plain, 1);
+}
+
+static void testNotStartedAndFailures()
+{
+    std::printf("not started / start failure / shutdown\n");
+    {
+        auto fake = std::make_shared<FakeTransport>();
+        MainQueue q;
+        HiveBridge bridge(fake, q.dispatcher());                 // never started
+        CHECK(!bridge.isStarted());
+        CHECK(!bridge.callAsync("X", "y", {}, [](const HiveResponse&) {}));
+        HiveResponse r = bridge.callSync("X", "y");
+        CHECK(!r.ok);
+        CHECK_EQ(r.error, std::string("bridge not started"));
+        CHECK_EQ(fake->requests().size(), size_t(0));            // nothing reached the transport
+
+        HiveAuthV4 auth(bridge);
+        bool called = false, delivered = true;
+        auth.setup([&](const HiveAuthV4::SetupResult& s) { called = true; delivered = s.delivered; });
+        CHECK(called);                                           // reported immediately, not lost
+        CHECK(!delivered);
+    }
+    {
+        auto fake = std::make_shared<FakeTransport>();
+        fake->setStartFailure("boom");
+        HiveBridge bridge(fake, nullptr);
+        std::string err;
+        CHECK(!bridge.start(&err));
+        CHECK_EQ(err, std::string("boom"));
+    }
+    {
+        Fixture f;
+        int calls = 0;
+        f.bridge.callAsync("X", "y", {}, [&](const HiveResponse&) { ++calls; });
+        const int id = parseJson(f.fake->requests()[0])["handlerId"].GetInt();
+        f.bridge.shutdown();
+        f.fake->emitFromOtherThread("{\"handlerId\":" + std::to_string(id) + "}");   // callback detached: no crash
+        f.queue.drain();
+        CHECK_EQ(calls, 0);
+    }
+    {
+        // Without a dispatcher the handler runs inline on the delivering thread.
+        auto fake = std::make_shared<FakeTransport>();
+        HiveBridge bridge(fake, nullptr);
+        bridge.start();
+        int calls = 0;
+        bridge.callAsync("X", "y", {}, [&](const HiveResponse&) { ++calls; });
+        fake->emit("{\"handlerId\":1}");
+        CHECK_EQ(calls, 1);
+    }
+}
+
+static void testResultApi()
+{
+    std::printf("resultAPI\n");
+    HiveResponse none;
+    CHECK(!none.resultAPI().isSuccess());                                   // absent -> UNKNOWN
+
+    auto reply = [](const char* json) { HiveResponse r; r.ok = true; r.doc = std::make_shared<rapidjson::Document>(); r.doc->Parse(json); return r; };
+    CHECK(reply("{\"resultAPI\":{\"errorCode\":0}}").resultAPI().isSuccess());
+    CHECK(reply("{\"resultAPI\":{\"errorCode\":-1,\"code\":-1100001}}").resultAPI().isSuccess() == false);
+    CHECK(reply("{\"resultAPI\":{\"errorCode\":-1,\"code\":0}}").resultAPI().isSuccess());   // either field >= 0 (as in the Unreal wrapper)
+    HiveResultAPI r = reply("{\"resultAPI\":{\"errorCode\":-99,\"code\":-1200055,\"errorMessage\":\"net\",\"latencyMs\":5000000000}}").resultAPI();
+    CHECK_EQ(r.code, -1200055);
+    CHECK_EQ(r.errorMessage, std::string("net"));
+    CHECK_EQ(r.latencyMs, int64_t(5000000000LL));                            // 64-bit latency
+}
+
+static void testDllTransportMissing()
+{
+    std::printf("DllTransport (missing DLL)\n");
+    DllTransport t(L"C:\\this\\directory\\does\\not\\exist");
+    std::string err;
+    CHECK(!t.start([](const std::string&) {}, &err));
+#ifdef _WIN32
+    CHECK(err.find("HIVE_PLUGIN_CPP.dll not found") != std::string::npos);
+#endif
+    CHECK_EQ(t.call("{}"), std::string());                                   // safe when not loaded
+    t.stop();
+    t.stop();                                                                // idempotent
+
+    auto transport = std::make_shared<DllTransport>(L"C:\\this\\directory\\does\\not\\exist");
+    HiveBridge bridge(transport, nullptr);
+    CHECK(!bridge.start(&err));
+    CHECK(!err.empty());
+    CHECK(!bridge.callSync("X", "y").ok);
+}
+
+int main()
+{
+    testRequestFormat();
+    testConfigurationSync();
+    testSyncFailures();
+    testAsyncMatchingAndThreading();
+    testOutOfOrderReplies();
+    testEvents();
+    testNotStartedAndFailures();
+    testResultApi();
+    testDllTransportMissing();
+
+    std::printf("\n%d checks, %d failed\n", g_checks, g_failures);
+    return g_failures == 0 ? 0 : 1;
+}

@@ -15,7 +15,7 @@ cocos2d-x **3.17.2**로 간단한 Windows 미니게임("떨어지는 물체 피�
 | 구성요소 | 버전 | 선정 근거 |
 |---|---|---|
 | VS 2022 Build Tools + MSVC v141 | v141 (VS2017, cl 19.16.x) | 3.17.2의 공식 지원 컴파일러는 VS2015/VS2017. 무료이고 IDE 없이 CLI로 빌드 가능 |
-| 대상 플랫폼 | Win32 (x86) | 3.17.2의 Windows 프리빌트 라이브러리가 x86 전용 |
+| 대상 플랫폼 | **x64** (Phase 6부터 x86 지원 제거) | Phase 0~4는 Win32(3.17.2 프리빌트가 x86 전용)였으나, Hive SDK Windows 네이티브가 x64뿐이라 x64 전용으로 전환(`docs/05`, `docs/06`) |
 | CMake | 3.31.x | 4.x는 오래된 `cmake_minimum_required` 호환이 제거되어 3.x로 고정 |
 | Python | 2.7.18 | cocos 콘솔(`setup.py`, `cocos new`)이 Python 2 기반 |
 | GitHub CLI | 최신 | 저장소 생성, 인증 |
@@ -42,6 +42,10 @@ cocos2dx_with_hive_windows/
 | 2 | 엔진 준비, 프로젝트 생성, 템플릿 빌드 | `docs/02-project-setup-and-build.md`, `tools/setup_engine.ps1`, `tools/build.ps1`, `DodgeGame/` | HelloWorld Debug/Release 빌드·실행, clone 후 재현 |
 | 3 | 미니게임 구현 | `docs/03-game-design.md`, `GameScene.h/.cpp` | 이동, 낙하, 충돌, 게임오버, 재시작, 점수 |
 | 4 | 리뷰와 디버깅 | `docs/04-review-and-debugging.md` | 리뷰 지적 반영, cdb 브레이크포인트 적중 |
+| 5 | 엔진·게임 x64 전환 (Hive SDK Windows 네이티브가 x64 전용). 브랜치 `phase5/x64-migration` | `docs/05-x64-migration.md`, `tools/build_deps_x64.ps1`, `tools/patches/engine-3.17.2-x64/`, `build.ps1`(x64) | x64 Debug/Release 빌드·실행, 새 clone·콜드 재현 (당시 Win32 회귀도 확인했으나 Phase 6에서 x86 제거) |
+| 6 | Hive SDK 연동 (초기화 + 설정). 브랜치 `phase6/hive-sdk-init` | `docs/06-hive-sdk-integration.md`, `HiveCocos/`, `tools/setup_hive.ps1` | `getHiveSDKVersion` 응답, `setup` 응답, cdb로 요청 JSON 확인, DLL 없을 때 오류 처리 |
+
+Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작이 확인된 뒤에만 `main`에 `--no-ff`로 병합한다.
 
 각 단계의 마무리 순서: 작업, 검증, 문서 작성, `git commit`, `git push`, 요약 보고.
 
@@ -51,3 +55,7 @@ cocos2dx_with_hive_windows/
 - [x] Phase 2: 엔진 준비, 프로젝트 생성, 템플릿 빌드
 - [x] Phase 3: 미니게임 구현
 - [x] Phase 4: 리뷰와 디버깅
+- [x] Phase 5: 엔진·게임 x64 전환 (브랜치 `phase5/x64-migration`, `main` 병합 전)
+- [x] Phase 6: Hive SDK 연동 — 초기화 + 설정 (브랜치 `phase6/hive-sdk-init`). 실제 SDK로 `setup` 응답 확인(HUD `Hive 4.26.7.0: ready (providers 9)`). x86 지원 제거(x64 전용)
+
+Phase 5부터 빌드는 x64 전용이다. `docs/01~04`는 Win32 시절의 기록이므로 해당 명령(`-Arch` 없이 Win32 빌드 등)은 더 이상 유효하지 않다. 현재 규칙은 `CLAUDE.md`를 따른다.

@@ -1,0 +1,42 @@
+--- a/cocos/ui/UIEditBox/UIEditBoxImpl-win32.cpp
++++ b/cocos/ui/UIEditBox/UIEditBoxImpl-win32.cpp
+@@ -61,7 +61,7 @@
+ 
+         s_hInstance = ::GetModuleHandleW(nullptr);
+ 
+-        s_prevCocosWndProc = (WNDPROC)SetWindowLongPtrW(s_hwndCocos, GWL_WNDPROC, (LONG_PTR)hookGLFWWindowProc);
++        s_prevCocosWndProc = (WNDPROC)SetWindowLongPtrW(s_hwndCocos, GWLP_WNDPROC, (LONG_PTR)hookGLFWWindowProc);
+     }
+ 
+     EditBoxImpl* __createSystemEditBox(EditBox* pEditBox)
+@@ -98,7 +98,7 @@
+     {
+         if (_hwndEdit)
+         {
+-            SetWindowLongPtrW(_hwndEdit, GWL_WNDPROC, (LONG_PTR)_prevWndProc);
++            SetWindowLongPtrW(_hwndEdit, GWLP_WNDPROC, (LONG_PTR)_prevWndProc);
+             ::DestroyWindow(_hwndEdit);
+             _hasFocus = false;
+             _changedTextManually = false;
+@@ -125,8 +125,8 @@
+                 s_hInstance,
+                 this);        // pointer not needed 
+ 
+-            SetWindowLongPtrW(_hwndEdit, GWL_USERDATA, (LONG_PTR)this);
+-            _prevWndProc = (WNDPROC)SetWindowLongPtrW(_hwndEdit, GWL_WNDPROC, (LONG_PTR)WindowProc);
++            SetWindowLongPtrW(_hwndEdit, GWLP_USERDATA, (LONG_PTR)this);
++            _prevWndProc = (WNDPROC)SetWindowLongPtrW(_hwndEdit, GWLP_WNDPROC, (LONG_PTR)WindowProc);
+ 
+             ::SendMessageW(_hwndEdit, EM_LIMITTEXT, this->_maxLength, 0);
+             s_previousFocusWnd = s_hwndCocos;
+--- a/cocos/base/ccMacros.h
++++ b/cocos/base/ccMacros.h
+@@ -287,7 +287,7 @@
+  /** https://github.com/google/protobuf/blob/master/src/google/protobuf/io/coded_stream.h **/
+  /******************************************************************************************/
+ #ifdef _MSC_VER
+-  #if defined(_M_IX86)
++  #if defined(_M_IX86) || defined(_M_X64)
+     #define CC_LITTLE_ENDIAN 1
+   #else
+     #define CC_LITTLE_ENDIAN 0

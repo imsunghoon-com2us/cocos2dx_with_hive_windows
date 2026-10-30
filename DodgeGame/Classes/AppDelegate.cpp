@@ -24,6 +24,9 @@
 
 #include "AppDelegate.h"
 #include "GameScene.h"
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+#include "HiveService.h"
+#endif
 
 // #define USE_AUDIO_ENGINE 1
 // #define USE_SIMPLE_AUDIO_ENGINE 1
@@ -51,8 +54,11 @@ AppDelegate::AppDelegate()
 {
 }
 
-AppDelegate::~AppDelegate() 
+AppDelegate::~AppDelegate()
 {
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+    HiveService::instance().shutdown();
+#endif
 #if USE_AUDIO_ENGINE
     AudioEngine::end();
 #elif USE_SIMPLE_AUDIO_ENGINE
@@ -124,6 +130,10 @@ bool AppDelegate::applicationDidFinishLaunching() {
 
     // run
     director->runWithScene(scene);
+
+#if (CC_TARGET_PLATFORM == CC_PLATFORM_WIN32)
+    HiveService::instance().start();
+#endif
 
     return true;
 }

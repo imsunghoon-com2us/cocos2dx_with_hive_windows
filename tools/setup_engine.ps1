@@ -80,6 +80,26 @@ if (Test-Path $versionFile) {
     Write-Host '[done] external deps'
 }
 
+# 3-1) x64 / optional-module patches (tools\patches\engine-3.17.2-x64\*.patch)
+# The engine tree lives outside the repo, so the patch files are the source of truth for our engine changes.
+# They only add branches (x64 paths, COCOS_USE_* options), so the Win32 build keeps working unchanged.
+# core.autocrlf=false: git apply would otherwise rewrite the (LF) engine files with CRLF.
+$patchDir = Join-Path $PSScriptRoot 'patches\engine-3.17.2-x64'
+if (Test-Path $patchDir) {
+    Push-Location $EngineRoot
+    try {
+        foreach ($p in (Get-ChildItem $patchDir -Filter '*.patch' | Sort-Object Name)) {
+            & cmd /c "git -c core.autocrlf=false apply --reverse --check -p1 `"$($p.FullName)`" 2>nul"
+            if ($LASTEXITCODE -eq 0) { Write-Host "[skip] patch $($p.Name) (already applied)"; continue }
+            & cmd /c "git -c core.autocrlf=false apply --check -p1 `"$($p.FullName)`""
+            if ($LASTEXITCODE -ne 0) { throw "patch $($p.Name) does not apply cleanly (partially applied or engine modified?)" }
+            & git -c core.autocrlf=false apply -p1 $p.FullName
+            if ($LASTEXITCODE -ne 0) { throw "git apply failed: $($p.Name)" }
+            Write-Host "[done] patch $($p.Name)"
+        }
+    } finally { Pop-Location }
+}
+
 # 4) junction
 $game = Join-Path $RepoRoot 'DodgeGame'
 $link = Join-Path $game 'cocos2d'

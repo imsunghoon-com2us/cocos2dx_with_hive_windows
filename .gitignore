@@ -24,3 +24,9 @@ Thumbs.db
 
 # Local editor settings (absolute paths)
 .vscode/
+
+# Hive SDK package (proprietary binaries, ~440MB CEF, contains keys/tokens) - never commit
+HiveSDKv4_unreal/
+
+# x64 build output
+DodgeGame/build-x64/

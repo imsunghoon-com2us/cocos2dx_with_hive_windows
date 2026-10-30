@@ -1,0 +1,120 @@
+--- a/external/cmake/CocosExternalConfig.cmake
++++ b/external/cmake/CocosExternalConfig.cmake
+@@ -33,7 +33,16 @@
+     set(platform_spec_path android/${ANDROID_ABI})
+ elseif(WINDOWS)
+     set(platform_name win32)
+-    set(platform_spec_path win32)
++    if(CMAKE_SIZEOF_VOID_P EQUAL 8)
++        # x64 prebuilt binaries live next to the win32 ones in a "win64" folder (built by tools/build_deps_x64.ps1).
++        # Headers are shared with win32 (platform_name stays win32).
++        set(win_arch_dir win64)
++        set(win_prebuilt_subdir "win64/")
++    else()
++        set(win_arch_dir win32)
++        set(win_prebuilt_subdir "")
++    endif()
++    set(platform_spec_path ${win_arch_dir})
+ elseif(MACOSX)
+     set(platform_name mac)
+     set(platform_spec_path mac)
+--- a/external/zlib/CMakeLists.txt
++++ b/external/zlib/CMakeLists.txt
+@@ -25,8 +25,8 @@
+     INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/../win32-specific/zlib/include"
+   )
+   set_target_properties(${target_name} PROPERTIES
+-    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../win32-specific/zlib/prebuilt/zlib1.dll"
+-    IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/../win32-specific/zlib/prebuilt/libzlib.lib"
++    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/../win32-specific/zlib/prebuilt/${win_prebuilt_subdir}zlib1.dll"
++    IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/../win32-specific/zlib/prebuilt/${win_prebuilt_subdir}libzlib.lib"
+   )
+ endif()
+ 
+--- a/external/sqlite3/CMakeLists.txt
++++ b/external/sqlite3/CMakeLists.txt
+@@ -18,7 +18,7 @@
+ )
+ if(WINDOWS)
+   set_target_properties(${target_name} PROPERTIES
+-    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/libraries/${platform_name}/${lib_name}.dll"
+-    IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/libraries/${platform_name}/${lib_name}.lib"
++    IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/libraries/${win_arch_dir}/${lib_name}.dll"
++    IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/libraries/${win_arch_dir}/${lib_name}.lib"
+   )
+ endif()
+\ No newline at end of file
+--- a/external/win32-specific/gles/CMakeLists.txt
++++ b/external/win32-specific/gles/CMakeLists.txt
+@@ -14,6 +14,6 @@
+ )
+ 
+ set_target_properties(${target_name} PROPERTIES
+-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/glew32.dll"
+-  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/glew32.lib"
++  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}glew32.dll"
++  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}glew32.lib"
+ )
+--- a/external/win32-specific/icon/CMakeLists.txt
++++ b/external/win32-specific/icon/CMakeLists.txt
+@@ -14,6 +14,6 @@
+ )
+ 
+ set_target_properties(${target_name} PROPERTIES
+-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/iconv.dll"
+-  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libiconv.lib"
++  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}iconv.dll"
++  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libiconv.lib"
+ )
+--- a/external/win32-specific/MP3Decoder/CMakeLists.txt
++++ b/external/win32-specific/MP3Decoder/CMakeLists.txt
+@@ -14,6 +14,6 @@
+ )
+ 
+ set_target_properties(${target_name} PROPERTIES
+-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libmpg123.dll"
+-  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libmpg123.lib"
++  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libmpg123.dll"
++  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libmpg123.lib"
+ )
+--- a/external/win32-specific/OggDecoder/CMakeLists.txt
++++ b/external/win32-specific/OggDecoder/CMakeLists.txt
+@@ -14,21 +14,21 @@
+ )
+ 
+ set_target_properties(${target_name} PROPERTIES
+-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libogg.dll"
+-  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libogg.lib"
++  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libogg.dll"
++  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libogg.lib"
+ )
+ 
+ # internal link depend
+  set_property(TARGET ${target_name} APPEND PROPERTY 
+- INTERFACE_LINK_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libvorbis.lib"
++ INTERFACE_LINK_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libvorbis.lib"
+ )
+ set_property(TARGET ${target_name} APPEND PROPERTY 
+-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libvorbis.dll"
++  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libvorbis.dll"
+ )
+ set_property(TARGET ${target_name} APPEND PROPERTY 
+- INTERFACE_LINK_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libvorbisfile.lib"
++ INTERFACE_LINK_LIBRARIES "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libvorbisfile.lib"
+ )
+ set_property(TARGET ${target_name} APPEND PROPERTY 
+-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/libvorbisfile.dll"
++  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}libvorbisfile.dll"
+ )
+ 
+--- a/external/win32-specific/OpenalSoft/CMakeLists.txt
++++ b/external/win32-specific/OpenalSoft/CMakeLists.txt
+@@ -14,6 +14,6 @@
+ )
+ 
+ set_target_properties(${target_name} PROPERTIES
+-  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/OpenAL32.dll"
+-  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/OpenAL32.lib"
++  IMPORTED_LOCATION "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}OpenAL32.dll"
++  IMPORTED_IMPLIB "${CMAKE_CURRENT_SOURCE_DIR}/prebuilt/${win_prebuilt_subdir}OpenAL32.lib"
+ )

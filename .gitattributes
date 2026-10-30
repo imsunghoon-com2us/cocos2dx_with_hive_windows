@@ -1,0 +1,3 @@
+# Patch files must keep LF line endings (git apply fails on CRLF).
+tools/patches/** -text
+*.patch -text
