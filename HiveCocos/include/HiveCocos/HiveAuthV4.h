@@ -62,6 +62,11 @@ public:
     // a sign-out, when setup is not run again). False when the bridge is not started or does not answer.
     bool isAutoSignIn();
 
+    // Synchronous. Clears the SDK's stored terms-of-service agreement data so that the next setup() shows the terms
+    // again (for testing). Call it before setup(). The native reply carries no result, so this only reports whether
+    // the request was sent (false when the bridge is not started).
+    bool resetAgreement();
+
     // Synchronous. Call before the process exits.
     bool terminateProcess();
 

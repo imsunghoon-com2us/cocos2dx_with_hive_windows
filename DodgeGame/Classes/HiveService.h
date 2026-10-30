@@ -63,6 +63,11 @@ public:
     void requestSignOut(ResultCallback done);
     void requestDeleteAccount(ResultCallback done);
 
+    // Test aid (the Reset menu entry): AuthV4.resetAgreement, which clears the SDK's stored terms agreement data.
+    // The native reply carries no result: true only means the request was sent. Whether the terms show again at the
+    // next start is for the tester to see.
+    bool resetAgreement();
+
 private:
     enum class Stage { Init, SignIn };
 

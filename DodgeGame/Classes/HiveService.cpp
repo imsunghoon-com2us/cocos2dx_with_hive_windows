@@ -252,6 +252,14 @@ void HiveService::requestSignIn()
     beginSignIn();
 }
 
+bool HiveService::resetAgreement()
+{
+    if (!_bridge) return false;
+    const bool sent = HiveAuthV4(*_bridge).resetAgreement();
+    log("[Hive] resetAgreement requested (sent=%d)", sent ? 1 : 0);
+    return sent;
+}
+
 // ---------------------------------------------------------------- sign-out / account deletion
 void HiveService::requestSignOut(ResultCallback done)
 {

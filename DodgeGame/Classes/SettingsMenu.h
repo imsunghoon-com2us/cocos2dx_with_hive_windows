@@ -6,6 +6,7 @@
 // The "Settings" button in the top-right corner of the game screen and its small drop-down menu:
 //   Log out          only for a linked (non-guest) account: a guest cannot sign in again after signing out
 //   Delete account   after a Delete / Cancel confirmation (irreversible)
+//   Reset terms      test aid: AuthV4.resetAgreement (always shown)
 // A successful sign-out or deletion returns to the title screen, where a key press starts a new sign-in.
 // While the drop-down is open the game is paused (GameScene asks isPanelOpen()).
 class SettingsMenu : public cocos2d::Node
@@ -23,6 +24,7 @@ private:
     void openPanel();       // rebuilt every time: the buttons depend on the account type
     void onLogout();
     void onDeleteAccount();
+    void onResetTerms();
 
     cocos2d::Node* _panel = nullptr;
     cocos2d::Vec2 _buttonCenter;

@@ -93,6 +93,7 @@ void SettingsMenu::openPanel()
         items.pushBack(ModalDialog::makeButton("Log out", kPanelButtonSize, [this](Ref*) { onLogout(); }, 18));
     }
     items.pushBack(ModalDialog::makeButton("Delete account", kPanelButtonSize, [this](Ref*) { onDeleteAccount(); }, 18));
+    items.pushBack(ModalDialog::makeButton("Reset terms", kPanelButtonSize, [this](Ref*) { onResetTerms(); }, 18));
 
     const float width = kPanelButtonSize.width + kPanelPadding * 2.0f;
     const float height = items.size() * kPanelButtonSize.height + (items.size() + 1) * kPanelPadding;
@@ -130,6 +131,22 @@ void SettingsMenu::onLogout()
             showMessage("Log out failed (" + reason + ").");
         }
     });
+}
+
+void SettingsMenu::onResetTerms()
+{
+    closePanel();
+    if (ModalDialog::isOpen()) return;
+
+    // Test aid: AuthV4.resetAgreement clears the SDK's stored terms agreement data.
+    if (HiveService::instance().resetAgreement())
+    {
+        showMessage("Terms agreement data was reset.\nRestart the game to see the terms.");
+    }
+    else
+    {
+        showMessage("Reset failed (Hive SDK not available).");
+    }
 }
 
 void SettingsMenu::onDeleteAccount()

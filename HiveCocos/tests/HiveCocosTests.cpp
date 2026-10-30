@@ -427,6 +427,19 @@ static void testPlayerDeleteAndAutoSignIn()
     CHECK(!HiveAuthV4(notStarted).isAutoSignIn());   // not started -> false, nothing sent
     CHECK_EQ(fake2->requests().size(), size_t(0));
 
+    // resetAgreement: a synchronous request without parameters; an empty reply is fine.
+    const size_t before = f.fake->requests().size();
+    f.fake->setResponder([](const std::string&) -> std::string { return ""; });
+    CHECK(auth.resetAgreement());
+    auto afterReqs = f.fake->requests();
+    CHECK_EQ(afterReqs.size(), before + 1);
+    rapidjson::Document rr = parseJson(afterReqs.back());
+    CHECK_EQ(std::string(rr["class"].GetString()), std::string("AuthV4"));
+    CHECK_EQ(std::string(rr["method"].GetString()), std::string("resetAgreement"));
+    CHECK_EQ(rr["handlerId"].GetInt(), -1);
+    CHECK(!HiveAuthV4(notStarted).resetAgreement());  // not started -> false, nothing sent
+    CHECK_EQ(fake2->requests().size(), size_t(0));
+
     // Guest detection from the sign-in reply. Only provider NAMES are read.
     auto parse = [](const std::string& playerInfoJson) {
         HiveResponse reply;

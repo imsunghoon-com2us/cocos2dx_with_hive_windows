@@ -58,6 +58,19 @@ GameScene 우측 상단 [Settings]
   **같은 키의 다음 입력을 REPEAT로 처리**해 게임이 무시할 수 있다(팝업에서 Enter로 재시도한 뒤 다음 팝업의 Enter가 먹히지 않은 현상과 일치한다. 클릭으로 닫으면 문제가 없었다).
 - 원인을 코드로 끝까지 확인한 것은 아니고, 조치 뒤 같은 시나리오(Enter만으로 3번)가 통과했다. 조치: 키로 팝업을 닫거나 타이틀에서 키로 로그인을 시작하면 **0.25초 뒤에** 동작을 실행해 키 뗌이 먼저 게임에 도착하게 한다(`ModalDialog::choose`, `TitleScene::onAction`).
 
+## 약관 시험용 Reset 메뉴 (Settings -> Reset terms)
+설정 드롭다운의 `Reset terms`는 SDK의 `AuthV4.resetAgreement`("약관동의 관련 데이터를 초기화")를 부른다. 게스트/연동 계정 모두에게 보이고, 누르면 안내 팝업이 뜬다.
+SDK가 시작되지 않았으면 `Reset failed (Hive SDK not available).`가 뜬다(임시 씬으로 화면 확인). 어댑터는 `HiveAuthV4::resetAgreement()`(동기, 응답에 결과가 없어 "요청을 보냈는가"만 반환)이고 단위 시험이 있다(153개).
+
+**효과는 확인되지 않았다.** 로그인하지 않은 상태에서 이 호출을 setup 전, setup 후에 각각 넣어 보았지만 다음 실행에 약관이 다시 뜨지 않았다(`propFolder`의 파일도 그대로). 로그인한 상태(메뉴가 보이는 조건)에서의 효과는 시험하지 못했다.
+
+약관이 **다시 뜨는 것이 확인된 방법**(2026-10-30, Release, real 존. 스냅샷으로 복원하며 시험):
+- `<exe 폴더>\propFolder\REAL_HiveProperty.dat` 삭제 또는 `propFolder` 폴더 삭제 -> 다음 실행에서 약관 표시. 게임을 실행 중에 지운 뒤 정상/강제 종료해도 파일이 다시 생기지 않아 마찬가지였다.
+- 이 파일은 동의 전 352 B, 동의 후 1824 B이고 실행마다 갱신된다. 파일 이름의 접두사는 zone(`REAL_`, Debug에는 `TEST_`)이다.
+- AppId 폴더(`%LOCALAPPDATA%\<AppId>`)의 `hdata.info`, `hdata2.info`, `hudata.info`, exe의 `cache` 폴더를 지워도 약관은 다시 뜨지 않았다.
+- 이전에 "AppId 파일이 약관을 좌우한다"고 한 설명은 판정 오류에서 나온 것이므로 이 문서 내용이 맞다.
+- 사용자가 겪은 "파일을 지워도 약관이 안 뜬다"는 재현하지 못했다(다른 exe 폴더의 파일을 지웠거나 로그인된 상태였을 가능성, 미확인).
+
 ## 한글 입력(IME)이 필요한가
 **코드로 판단한 결론: 필요 없을 가능성이 높다. 실제 입력으로는 확인하지 못했다(미확인).**
 - `HIVEUIFramework.dll`(26.7.0)은 `setImeProcess`, `registerImeEventCallback`, `setUseExternalTsfIme`, `registerImeCompositionBoundsCallback`을 내보낸다(`dumpbin /exports`).
