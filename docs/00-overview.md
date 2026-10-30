@@ -59,7 +59,7 @@ Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작
 - [x] Phase 4: 리뷰와 디버깅
 - [x] Phase 5: 엔진·게임 x64 전환 (브랜치 `phase5/x64-migration`, Phase 6과 함께 `main` 병합 완료 `e8422c5`)
 - [x] Phase 6: Hive SDK 연동 — 초기화 + 설정 (브랜치 `phase6/hive-sdk-init`). 실제 SDK로 `setup` 응답 확인(HUD `Hive 4.26.7.0: ready (providers 9)`). x86 지원 제거(x64 전용). `main` 병합 완료
-- [x] Phase 7: 엔진 패치 x86 분기 정리 (브랜치 `phase7/engine-patch-cleanup`, `main` 병합 전)
-- [ ] Phase 8: Hive 로그인과 AppId (브랜치 `phase8/hive-login`, `main` 병합 전). 구현·단위 시험·로그인 UI 표시 확인 완료, **실제 로그인/로그아웃/자동 로그인은 사용자 확인 대기**
+- [x] Phase 7: 엔진 패치 x86 분기 정리 (브랜치 `phase7/engine-patch-cleanup`, `main` 병합 완료)
+- [x] Phase 8: Hive 로그인과 AppId (브랜치 `phase8/hive-login`, `main` 병합 완료). 구현·단위 시험(119개)·로그인 UI 표시 확인, `real` 존 약관 동의 후 **사용자가 로그인 동작 확인**. 로그아웃/자동 로그인/한글 입력(IME)은 확인 결과 미전달(`docs/08` 참고)
 
 Phase 5부터 빌드는 x64 전용이다. `docs/01~04`는 Win32 시절의 기록이므로 해당 명령(`-Arch` 없이 Win32 빌드 등)은 더 이상 유효하지 않다. 현재 규칙은 `CLAUDE.md`를 따른다.

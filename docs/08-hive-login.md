@@ -11,7 +11,8 @@
 | 새 AppId로 `setup` (`test` 존) | `ready (providers 8)` (이전 `steam` AppId는 `providers 9`). 약관 동의는 유지되어 클릭 없이 3초 만에 `ready` |
 | 단위 시험 | **119개 검사 통과**(이전 87 + 로그인 32). 토큰 노출 변이 시험으로 실패를 잡아냄 |
 | `L` 키 -> Hive 로그인 UI | **확인됨.** `showSignIn` 요청 후 HUD `Login: Hive sign-in UI...`, 화면에 계정 선택 UI(Google, Hive, Apple, Facebook, X, Telegram, LINE, 게스트, "로그인 상태 유지")가 뜸. 제 시험에서는 UI에서 아무것도 선택하지 않았다 |
-| 실제 로그인 완료, 로그아웃, 자동 로그인 | **미확인 - 사용자 확인 대상**(계정 생성/로그인은 대신하지 않았다) |
+| 실제 로그인 (`real` 존) | **사용자 확인 완료.** 사용자가 `real` 존의 약관에 직접 동의한 뒤 로그인이 동작함을 확인했다(제가 직접 계정을 만들거나 로그인하지는 않았다). 어떤 provider로 했는지와 HUD 문구 세부는 전달받지 못했다 |
+| 로그아웃, 자동 로그인, 한글 입력(IME) | **확인 결과를 전달받지 못함 - 미확인으로 간주** |
 | 빌드 | x64 Debug, Release 오류 0, 우리 코드 경고 0 |
 
 ## AppId와 Zone 적용 방식
@@ -68,7 +69,7 @@ DodgeGame/Classes/GameScene.cpp                                  L/O 키, HUD �
 6. 실패하면 HUD의 `code N`과 콘솔 로그(`[Hive] sign-in reply: ...`)를 알려 달라.
 
 ## 알려진 한계 / 미확인
-- 실제 로그인 완료(`signIn`/`showSignIn` 성공 응답과 `playerInfo` 값), `signOut`, 자동 로그인은 확인하지 못했다.
+- 로그인 완료는 사용자가 `real` 존에서 확인했지만, 성공 응답의 `playerInfo` 값과 사용한 provider는 기록하지 못했다. `signOut`과 자동 로그인(`isAutoSignIn`)은 확인 결과를 전달받지 못했다.
 - **한글/IME 입력**: UE 쪽은 `showSignIn` 전후로 `HIVESDKCEFImeEnable/Disable`(HIVEUIFramework의 IME 함수)을 호출한다. 이 어댑터는 호출하지 않으므로 Hive 로그인 UI의 입력창(이메일 등)에서 키보드/한글 입력이 되는지 확인되지 않았다. 안 되면 IME 연동이 다음 작업이다.
 - Google, Facebook 등 웹 기반 로그인이 외부 브라우저나 팝업을 여는지, 복귀가 되는지 확인하지 않았다.
 - `<market>GO</market>` 값과 Microsoft Store AppId의 조합이 맞는지 확인하지 않았다.
