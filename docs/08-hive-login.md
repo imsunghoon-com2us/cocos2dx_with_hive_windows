@@ -20,7 +20,7 @@ SDK는 exe 옆 `Resources\hive_config.xml`을 읽는다. 샘플 설정은 `steam
 - 현재 PC에는 `hive.local.json`에 위 AppId를 넣어 두었으므로 `tools\setup_hive.ps1 -Config Debug|Release`만 실행해도 적용된다.
 - 매 실행이 샘플 설정을 다시 복사한 뒤 AppId를 덮어쓴다. AppId를 지정하지 않으면 SDK 샘플 값(`steam`)으로 돌아간다.
 - 게임 쪽 `HiveService`는 `HIVE_APP_ID`가 있으면 `setup` 전에 `Configuration.setAppId`로도 지정한다(런타임 덮어쓰기).
-- AppId는 비밀값이 아니지만 저장소에는 넣지 않았다(public 전환 예정).
+- 이 AppId는 SDK 공식 패키지의 샘플 `hive_config.xml`에 후보로 이미 적혀 있는 공개 값이라 노출돼도 문제없다(사용자 확인). `hive.local.json`은 보안 때문이 아니라 PC별 설정을 저장소 밖에 두기 위한 편의다. clone만으로 같은 AppId가 적용되게 하려면 `setup_hive.ps1`의 기본값으로 커밋하면 된다(아직 하지 않음). 실제 게임용 AppId와 `appsflyer` 같은 키는 별개이며 계속 커밋하지 않는다.
 - **`<market>GO</market>`는 그대로다.** AppId만 Microsoft Store용으로 바뀌었고 마켓 값은 유효한 값을 몰라 건드리지 않았다. 로그인 동작에 영향이 있는지는 확인하지 못했다.
 
 ## 구조
