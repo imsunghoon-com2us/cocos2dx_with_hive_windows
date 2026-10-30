@@ -1,5 +1,7 @@
 # 04. 리뷰와 디버깅 (Phase 4)
 
+> 참고: 이 문서는 Win32(x86) 시절의 기록이다. 문서의 cdb 사용법은 x86 기준(`@ecx`, `esp+4`)이며, 현재 x64에서는 `@rcx`와 x64 cdb를 쓴다(`CLAUDE.md`, `docs/05`).
+
 ## 1. 코드 리뷰
 `/code-review medium`으로 `GameScene.h/.cpp`, `AppDelegate.cpp`를 리뷰했고 8건이 나왔다.
 리뷰가 적은 줄 번호(`AppDelegate.cpp` 465, `GameScene.cpp` 370)는 실제 파일 길이(151줄, 308줄)를 넘어 신뢰할 수 없어서, 모든 지적을 내용 기준으로 직접 대조했다.

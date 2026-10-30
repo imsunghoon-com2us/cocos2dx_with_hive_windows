@@ -33,7 +33,7 @@ $py = Find-Exe 'python' @('C:\Python27\python.exe')
 $pyVer = if ($py) { (cmd /c "`"$py`" --version 2>&1" | Out-String).Trim() } else { '' }
 Report 'python 2.7.18' ($pyVer -like '*2.7.18*') $(if ($py) { "$pyVer ($py)" } else { 'not found' })
 
-# MSVC v141 x86 툴셋
+# MSVC v141 툴셋 (VS 컴포넌트 ID의 x86.x64는 호스트/타깃 도구 묶음 이름이다. 이 프로젝트는 x64만 빌드한다)
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vsPath = $null
 if (Test-Path $vswhere) {
@@ -45,21 +45,21 @@ Report 'MSVC v141' ([bool]$vsPath) $(if ($vsPath) { $vsPath } else { 'VC.v141.x8
 $v170 = if ($vsPath) { Join-Path $vsPath 'MSBuild\Microsoft\VC\v170\Microsoft.Cpp.Default.props' } else { $null }
 Report 'MSBuild v170' ($v170 -and (Test-Path $v170)) $(if ($v170 -and (Test-Path $v170)) { 'found' } else { 'VC.Tools.x86.x64 component missing (see docs/01-environment-setup.md)' })
 
-# Windows SDK 10.0.19041.0 (32비트 레지스트리 뷰 기준 경로에 Lib가 있어야 한다)
+# Windows SDK 10.0.19041.0의 x64 UCRT 라이브러리.
+# 64비트 MSBuild는 64비트 레지스트리 뷰에서 잘못된 SDK 루트를 읽는 PC가 있어(tools\build.ps1의 UCRTContentRoot 우회),
+# SDK 위치를 32비트 레지스트리 뷰로 찾는다. x86 빌드를 위한 것이 아니다.
 $kitsKey = [Microsoft.Win32.RegistryKey]::OpenBaseKey('LocalMachine', 'Registry32').OpenSubKey('SOFTWARE\Microsoft\Windows Kits\Installed Roots')
 $kits = if ($kitsKey) { $kitsKey.GetValue('KitsRoot10') } else { $null }
-$ucrt = if ($kits) { Join-Path $kits 'Lib\10.0.19041.0\ucrt\x86\ucrtd.lib' } else { $null }
-Report 'Win SDK 19041' ($ucrt -and (Test-Path $ucrt)) $(if ($ucrt -and (Test-Path $ucrt)) { $kits } else { 'Lib\10.0.19041.0\ucrt not found' })
+$ucrt = if ($kits) { Join-Path $kits 'Lib\10.0.19041.0\ucrt\x64\ucrtd.lib' } else { $null }
+Report 'Win SDK 19041' ($ucrt -and (Test-Path $ucrt)) $(if ($ucrt -and (Test-Path $ucrt)) { $kits } else { 'Lib\10.0.19041.0\ucrt\x64 not found' })
 
-# x64 빌드 도구: v141 x64 컴파일러/링커와 UCRT x64 라이브러리
+# v141 x64 컴파일러/링커
 $cl64 = if ($vsPath) { Get-ChildItem (Join-Path $vsPath 'VC\Tools\MSVC') -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '14.16.*' } | ForEach-Object { Join-Path $_.FullName 'bin\HostX64\x64\cl.exe' } | Where-Object { Test-Path $_ } | Select-Object -First 1 } else { $null }
 Report 'MSVC v141 x64' ([bool]$cl64) $(if ($cl64) { $cl64 } else { 'bin\HostX64\x64\cl.exe (14.16.*) not found' })
-$ucrt64 = if ($kits) { Join-Path $kits 'Lib\10.0.19041.0\ucrt\x64\ucrtd.lib' } else { $null }
-Report 'UCRT x64' ($ucrt64 -and (Test-Path $ucrt64)) $(if ($ucrt64 -and (Test-Path $ucrt64)) { 'found' } else { 'Lib\10.0.19041.0\ucrt\x64 not found' })
 
-# cdb (Debugging Tools for Windows)
-$cdb = Find-Exe 'cdb' @("${env:ProgramFiles(x86)}\Windows Kits\10\Debuggers\x86\cdb.exe")
-Report 'cdb' ([bool]$cdb) $(if ($cdb) { $cdb } else { 'not found' })
+# cdb x64 (Debugging Tools for Windows). x86 cdb는 x64 프로세스를 디버깅할 수 없다.
+$cdb = Find-Exe 'cdb' @("$env:ProgramFiles\Windows Kits\10\Debuggers\x64\cdb.exe")
+Report 'cdb x64' ([bool]$cdb) $(if ($cdb) { $cdb } else { 'Debuggers\x64\cdb.exe not found' })
 
 if ($fail -gt 0) { Write-Host "`n$fail item(s) failed."; exit 1 }
 Write-Host "`nAll OK."; exit 0

@@ -4,30 +4,36 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 
 ## 툴체인 (버전 고정)
 - 컴파일러: VS 2022 Build Tools의 MSVC **v141** 툴셋 (`-T v141`)
-- 플랫폼: **Win32 (x86)** 와 **x64** 를 모두 빌드한다(`-Arch Win32|x64`, 기본 Win32).
-  - x64는 3.17.2에 데스크톱 x64 프리빌트가 없어 `tools/build_deps_x64.ps1`로 직접 빌드한 라이브러리를 쓴다(`docs/05-x64-migration.md`).
-  - x64 빌드는 네트워크 모듈(`HttpClient`, `WebSocket`, `SocketIO`, `Downloader`, assets-manager)과 Bullet/Box2D가 **제외**된다(`COCOS_USE_NETWORK=OFF`, `COCOS_USE_BULLET_BOX2D=OFF`). Win32는 그대로 포함.
+- 플랫폼: **x64 전용**. Hive SDK 네이티브 DLL이 x64뿐이라 Phase 6부터 x86(Win32) 빌드를 지원하지 않는다
+  (`DodgeGame/CMakeLists.txt`가 Win32 configure를 오류로 막고, `build.ps1`은 `-Arch`를 받지 않는다).
+  - 3.17.2에 데스크톱 x64 프리빌트가 없어 `tools/build_deps_x64.ps1`로 직접 빌드한 라이브러리를 쓴다(`docs/05-x64-migration.md`).
+  - 네트워크 모듈(`HttpClient`, `WebSocket`, `SocketIO`, `Downloader`, assets-manager)과 Bullet/Box2D는 **제외**된다(`COCOS_USE_NETWORK=OFF`, `COCOS_USE_BULLET_BOX2D=OFF`).
 - CMake 3.31.x (4.x 사용 금지), Python 2.7.18 (cocos 콘솔용)
 - 환경 점검: `tools/check_env.ps1`
 
 ## 명령
 - 엔진 복원: `tools/setup_engine.ps1` (엔진 다운로드, **x64 패치 적용**, `DodgeGame\cocos2d` junction 생성)
 - x64 라이브러리 빌드: `tools/build_deps_x64.ps1` (약 25분, 이미 있으면 건너뜀. `-Only`, `-Force`)
-- 빌드: `tools/build.ps1 -Config Debug|Release [-Arch Win32|x64]` (산출물 `DodgeGame\build` / `DodgeGame\build-x64`)
-- Hive SDK 런타임 배치(x64 전용): `tools/setup_hive.ps1 -Config Debug|Release` (변경분만 복사, 구성당 약 740MB)
+- 빌드: `tools/build.ps1 -Config Debug|Release [-Clean]` (산출물 `DodgeGame\build-x64`)
+- Hive SDK 런타임 배치: `tools/setup_hive.ps1 -Config Debug|Release` (변경분만 복사, 구성당 약 740MB).
+  SDK의 이용약관 동의는 사람이 직접 해야 한다(동의 전에는 `setup` 응답이 오지 않고 HUD가 `setup...`에 머문다).
+  관찰상 **구성(exe 폴더)마다 처음 한 번** 필요했다: Release에서 동의한 뒤 같은 Release 폴더의 새 인스턴스는 3초 만에 `ready`가 됐지만,
+  Debug 폴더에서는 약관이 다시 떴다(저장 위치는 확인하지 못했다).
 - Hive 어댑터 시험(`HiveCocos/`): `cmake --build DodgeGame\build-x64 --config Debug --target HiveCocosTests` 후 실행(SDK 불필요).
   실제 SDK 통합은 `--target HiveSdkProbe`(SDK 폴더를 작업 디렉터리로, **빌드 폴더의 원본 exe**를 실행. 복사본은 막힐 수 있다)
-- 디버깅: Win32는 `...\Debuggers\x86\cdb.exe`, x64는 `C:\Program Files\Windows Kits\10\Debuggers\x64\cdb.exe`
-  (`-G`로 실행. `-c "..."` 스크립트를 쓸 때는 `-g`를 쓰지 않는다: `-c`가 초기 중단에서 실행되기 때문. 대화형 디버깅은 `-g -G`도 된다).
-  x64에서 `this`는 `@rcx`(x86은 `@ecx`).
+- 디버깅: `C:\Program Files\Windows Kits\10\Debuggers\x64\cdb.exe` (x86 cdb는 x64 프로세스를 디버깅할 수 없다).
+  `-G`로 실행. `-c "..."` 스크립트를 쓸 때는 `-g`를 쓰지 않는다(`-c`가 초기 중단에서 실행되기 때문. 대화형 디버깅은 `-g -G`도 된다).
+  출력을 파일로 받으려면 리다이렉트 대신 `-logo <file>`을 쓴다(리다이렉트는 블록 버퍼링). x64에서 `this`는 `@rcx`.
 
 ## 디렉터리 규칙
 - `DodgeGame/cocos2d/`는 엔진 junction이며 git에서 제외된다. **직접 수정하지 않는다.**
   엔진을 고쳐야 하면 `tools/patches/engine-3.17.2-x64/*.patch`에 패치로 추가한다(`setup_engine.ps1`이 멱등하게 적용).
-  패치는 Win32 동작을 바꾸지 않게 분기를 **추가**하는 방식으로만 쓴다. 패치 파일은 LF 줄바꿈을 유지한다(`.gitattributes`).
+  패치 파일은 LF 줄바꿈을 유지한다(`.gitattributes`). 현재 패치에는 x86용 분기(`CMAKE_SIZEOF_VOID_P` 분기, `COCOS_USE_*` 기본 ON)가
+  비활성 상태로 남아 있다. 동작에는 영향이 없고, 정리하려면 패치 재생성과 콜드 재현 재검증이 필요하다.
 - Hive SDK 연동 어댑터는 `HiveCocos/`(cocos 무의존 핵심 + `CocosDispatcher.cpp` 한 파일만 cocos 의존)에 둔다. 코드는 ASCII/영문 주석으로 쓴다.
 - `tools/*.ps1`은 **PowerShell로 다시 쓰지 않는다**(BOM 변환 직후 파일이 사라진 사례가 반복됨). BOM이 필요하면 내용 맨 앞에 BOM 문자(U+FEFF)를 넣어 Write 도구로 한 번에 만든다.
-- 게임 코드는 `DodgeGame/Classes/`에 둔다. 새 파일은 `CMakeLists.txt`와 `proj.win32` vcxproj 양쪽에 등록한다.
+- 게임 코드는 `DodgeGame/Classes/`에 둔다. 새 파일은 `DodgeGame/CMakeLists.txt`에 등록한다
+  (레거시 `proj.win32` VS 프로젝트 파일은 x86 제거와 함께 삭제했다. `proj.win32/`의 `main.cpp`, `game.rc` 등은 CMake가 쓴다).
 - 빌드 산출물(`build/`, `build-x64/`, `Debug.win32/`, `Release.win32/`)은 커밋하지 않는다.
 - **`HiveSDKv4_unreal/`(Hive SDK 패키지)는 절대 커밋하지 않는다.** 독점 바이너리(CEF 약 440MB)와 키/토큰이 들어 있어 `.gitignore`로 제외되어 있다.
   `git add -A`를 쓰지 말고 경로를 지정해 스테이징한다.

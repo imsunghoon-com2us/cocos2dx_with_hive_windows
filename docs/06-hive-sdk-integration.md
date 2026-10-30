@@ -9,12 +9,12 @@ UE4/5용으로 배포되는 Hive SDK v4 **Windows 네이티브**를 cocos2d-x에
 |---|---|
 | 핵심 단위 시험(`HiveCocosTests`) | 87개 검사 통과 (x64 Debug, Release). 변이 시험으로 실패를 잡아냄 |
 | 실제 SDK 통합 시험(`HiveSdkProbe`) | DLL 로드, 콜백 등록, 동기 호출(`getHiveSDKVersion` = `4.26.7.0`), **비동기 응답이 SDK 콜백으로 도착해 dispatcher 스레드에서 실행됨**, `resultAPI` errorCode=0 |
-| 게임 + 실제 SDK (x64 Debug, Release) | 버전 조회 후 `setup` 요청 전송, **Hive 이용약관 동의 화면이 게임 창 위에 표시됨**(CEF 오버레이) |
+| 게임 + 실제 SDK (x64 Debug, Release) | 버전 조회 후 `setup` 요청 전송, 첫 실행에서 **Hive 이용약관 동의 화면이 게임 창 위에 표시됨**(CEF 오버레이). 동의 후 HUD `Hive 4.26.7.0: ready (providers 9)` |
 | cdb로 실제 요청 확인 | 아래 "와이어 형식" |
 | DLL 없음 / x86 + x64 DLL / 시작 실패 | 크래시 없이 명확한 오류, 게임은 계속 실행 |
 | 종료 | SDK 활성 상태에서 0.5초 안에 종료, 남는 프로세스 없음, WER 크래시 기록 없음 (종료 코드 값은 PowerShell에서 읽지 못함) |
-| Win32 빌드/실행 | 성공 (HiveCocos 포함 빌드, SDK 없이 `Hive: SDK unavailable`) |
-| **`setup` 응답(HUD `ready`/`failed`)** | **미확인 - 약관 동의(사람의 클릭)가 필요하다. "남은 검증" 참고** |
+| x86(Win32) | Phase 6 구현 시점에는 빌드·실행이 됐으나(SDK 없이 `Hive: SDK unavailable`), 이후 **x86 지원을 제거**했다(아래 "x86 제거") |
+| **`setup` 응답(HUD `ready`)** | **확인됨.** 사용자가 Release에서 약관에 동의한 뒤 HUD `Hive 4.26.7.0: ready (providers 9)`(사용자 스크린샷). 같은 Release 폴더에서 제가 띄운 새 인스턴스도 클릭 없이 3초 만에 같은 로그(`[Hive] Hive 4.26.7.0: ready (providers 9)`)가 나옴. **Debug 폴더에서는 약관이 다시 떴다**(동의 상태가 구성별로 저장되는 것으로 보이나 저장 위치는 확인하지 못함) |
 
 ## 구조
 ```
@@ -58,7 +58,7 @@ cdb로 실제 전달된 요청(`bu HIVE_PLUGIN_CPP!HiveCPP_CallNative ".printf \
 
 ## 사용법
 ```powershell
-tools\build.ps1 -Config Debug -Arch x64        # 게임 빌드 (Win32도 빌드되지만 SDK는 x64 전용)
+tools\build.ps1 -Config Debug                  # 게임 빌드 (x64 전용)
 tools\setup_hive.ps1 -Config Debug             # SDK 런타임을 exe 옆에 배치 (약 18초, 변경분만)
 DodgeGame\build-x64\bin\DodgeGame\Debug\DodgeGame.exe
 ```
@@ -90,11 +90,19 @@ DodgeGame\build-x64\bin\DodgeGame\Debug\DodgeGame.exe
 - 첫 시도에서 "SDK 없을 때 오류 경로"를 보려던 `setup_hive.ps1` 실행이 Release exe가 이미 있어서 실제 복사 경로로 들어갔다(가정이 틀렸음). 빌드 산출물 폴더라 피해는 없었다.
 
 ## 알려진 한계 / 남은 검증
-- **`setup` 응답은 사람이 약관에 동의해야 도착한다.** 첫 실행에서 SDK가 `이용약관` 화면(`전체 선택`, `시작`)을 띄우고 동의 전까지 응답하지 않는다. 약관 동의는 대신하지 않았다. HUD의 최종 문구(`ready` 또는 `setup failed (code N)`)는 직접 확인이 필요하다.
+- **`setup` 응답은 사람이 약관에 동의해야 도착한다.** 첫 실행에서 SDK가 `이용약관` 화면(`전체 선택`, `시작`)을 띄우고 동의 전까지 응답하지 않는다. 약관 동의는 대신하지 않았고 사용자가 직접 했다. 동의 상태는 구성(exe 폴더)마다 따로 필요한 것으로 관찰됐다(Release 동의 후에도 Debug는 다시 뜸). 새 구성/새 폴더에서 자동 시험을 하려면 한 번은 사람이 동의해야 한다. **Debug 폴더의 `ready`는 아직 확인하지 않았다**(동의 필요).
 - `HiveService::start()`의 설정 호출과 버전 조회는 **동기**라 SDK 초기화 동안 cocos 스레드를 막는다(체감 지연은 측정하지 않았다).
 - `terminateProcess`를 종료 시 호출한다. 종료는 빠르고 크래시 기록이 없었지만, `setup` 완료 전에 종료하는 경우만 시험했다.
 - `AppId`는 SDK 샘플의 `hive_config.xml`을 그대로 썼다. 실제 게임용 AppId/Zone은 환경 변수 또는 설정 파일로 지정해야 한다(저장소에 넣지 않는다).
 - Steam/Google Play/DMM 플러그인 DLL은 함께 배치되지만 사용하지 않았고, 로드 여부는 확인하지 않았다.
-- 레거시 `proj.win32` vcxproj에는 `HiveService`와 `HiveCocos` 소스, include 경로를 등록했으나 **이 vcxproj는 빌드해 보지 않았다**(`.filters`는 갱신하지 않음). 지원되는 빌드는 CMake(`tools/build.ps1`)다.
+- 레거시 `proj.win32` vcxproj에는 한때 `HiveService`와 `HiveCocos` 소스를 등록했으나 빌드해 본 적이 없었고, x86 제거와 함께 파일을 삭제했다. 지원되는 빌드는 CMake(`tools/build.ps1`)뿐이다.
 - 요청의 `engine`/`platform` 값은 `"cpp"`만 시험했다. SDK 서버 쪽 분석에서 엔진 구분이 필요하면 값 협의나 SDK 소스(GitHub) 확인이 필요하다.
 - 로그인 UI와 CEF 오버레이(`HIVEGraphicsHook`)는 `setup`의 약관 화면에서 이미 동작하는 것을 봤지만(OpenGL 오버레이), 입력 포커스, 한글 입력(IME) 등은 검증하지 않았다.
+
+## x86 제거 (Phase 6 마무리)
+Hive SDK 적용과 동작 확인이 우선이고 SDK가 x64 전용이라 x86 지원을 제거했다(사용자 결정).
+- `tools/build.ps1`: `-Arch` 삭제, 항상 x64. `[CmdletBinding()]`을 넣어 예전 `-Arch Win32`가 **조용히 무시되고 x64로 빌드되는 것**을 막았다(오류로 거부).
+- `tools/check_env.ps1`: x64 UCRT/컴파일러/cdb 점검만 남김. `Win SDK 19041` 점검은 32비트 레지스트리 뷰로 SDK 위치를 찾는 우회용이라 유지.
+- `DodgeGame/CMakeLists.txt`: Windows에서 포인터 크기 4바이트면 `FATAL_ERROR`(임시 폴더에서 `-A Win32` configure로 실제 거부됨을 확인).
+- 레거시 `proj.win32/DodgeGame.{sln,vcxproj,vcxproj.filters}` 삭제(CMake가 쓰는 `main.cpp`, `game.rc`, `resource.h`, `res/`는 유지).
+- 엔진 패치의 x86 분기와 `DllTransport`의 "x64 DLL을 x86에 로드" 안내 문구는 비활성/무해라 남겼다.

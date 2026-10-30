@@ -29,6 +29,11 @@ set(APP_NAME DodgeGame)
 
 project(${APP_NAME})
 
+# The Hive SDK native DLLs are x64 only, so this project builds for x64 only (use tools/build.ps1).
+if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 4)
+    message(FATAL_ERROR "DodgeGame is x64 only (the Hive SDK native DLLs are x64). Configure with -A x64 or run tools/build.ps1.")
+endif()
+
 set(COCOS2DX_ROOT_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cocos2d)
 set(CMAKE_MODULE_PATH ${COCOS2DX_ROOT_PATH}/cmake/Modules/)
 

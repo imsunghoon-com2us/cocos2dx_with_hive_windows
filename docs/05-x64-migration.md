@@ -4,7 +4,7 @@
 
 ## 왜 x64인가
 Hive SDK v4 Windows(UE용 패키지)의 네이티브 DLL은 **전부 x64**이고 x86 프로세스에 로드할 수 없다.
-cocos2d-x 3.17.2는 Win32(x86)로만 빌드되어 있었으므로 엔진과 게임을 x64로 옮긴다. Win32 빌드는 그대로 유지한다.
+cocos2d-x 3.17.2는 Win32(x86)로만 빌드되어 있었으므로 엔진과 게임을 x64로 옮긴다. Phase 5 시점에는 Win32 빌드를 그대로 유지했고 회귀 시험도 했지만, Phase 6 마무리에서 **x86 지원을 제거**했다(`docs/06` "x86 제거"). 아래 Win32 관련 기록은 그 시점의 사실이다.
 
 ## 결과
 | 항목 | 결과 |
@@ -68,7 +68,7 @@ zlib, sqlite3, GLEW, OpenAL, mpg123, ogg/vorbis, iconv는 API 호환되는 더 �
 산출물 26개(`.dll`/`.lib`)를 직접 `dumpbin`으로 검사해 **전부 machine=8664**임을 확인했다. DLL 의존성은 시스템 DLL과 VC/UCRT 런타임뿐이다.
 
 ### 4. 빌드/점검 스크립트
-- `tools/build.ps1 -Arch Win32|x64`: 빌드 폴더 분리(`build`/`build-x64`), x64는 위 두 옵션을 자동 지정. `UCRTContentRoot` 우회는 그대로.
+- `tools/build.ps1 -Arch Win32|x64`(Phase 5 시점. 현재는 `-Arch`가 없고 항상 x64): 빌드 폴더 분리(`build`/`build-x64`), x64는 위 두 옵션을 자동 지정. `UCRTContentRoot` 우회는 그대로.
 - `tools/check_env.ps1`: `MSVC v141 x64`(`HostX64\x64\cl.exe`), `UCRT x64` 점검 추가.
 - `.gitignore`: `HiveSDKv4_unreal/`, `DodgeGame/build-x64/` 추가(이 브랜치의 첫 커밋).
 
@@ -108,6 +108,8 @@ Phase 2에서 1회, Phase 5에서 서브에이전트 작업 중 `build_deps_x64.
 - 서브에이전트가 만든 `build_deps_x64.ps1`이 작업 중 한 번 사라졌다가 복구된 적이 있다(Phase 2의 `tools/` 파일 소실과 같은 현상, 원인 불명). 커밋 전에 파일 존재를 직접 확인했다.
 
 ## 알려진 한계
+- **`build_deps_x64.ps1`이 내려받는 소스 15개는 체크섬 검증이 없다**(스크립트에 해시 관련 코드가 없다). 업스트림이 바뀌거나 변조돼도 감지하지 못하고, 일부 URL(osgeo `old/` 경로 등)은 바뀔 수 있다.
+  저장소를 public으로 전환하기 **전에** 반드시 처리할 후속 작업이다: 이미 받아 둔 파일의 SHA256을 스크립트에 고정하고 `Get-Source`에서 검증(불일치 시 실패)하도록 한다. 지금은 SDK 동작 확인을 우선해 미뤘다.
 - x64에는 네트워크 모듈이 없다. Hive SDK는 자체 네트워크 스택(libcurl 등)을 쓰므로 영향이 없지만, 게임 쪽에서 HTTP/WebSocket이 필요해지면 OpenSSL/curl/websockets를 따로 x64로 빌드해야 한다(Hive의 DLL 이름과 충돌하지 않게 주의).
 - x64 라이브러리는 Release 위주다(chipmunk만 Debug 포함). Debug x64 exe(`/MDd`)는 `/MD`로 빌드한 정적 라이브러리를 링크하므로 링커 경고 `LNK4098`(`MSVCRT` 기본 라이브러리 충돌)이 1건 나온다. 빌드·실행·시험은 문제없었다(Win32 프리빌트도 같은 구조). 힙 할당/해제가 라이브러리와 exe 경계를 넘는 코드에서 Debug CRT 단언이 날 수 있으니 Debug 시험에서 이상이 보이면 먼저 의심한다.
 - x64 Debug 빌드에는 엔진 코드의 컴파일러 경고가 약 880건 있다(`C4244` 766, `C4305` 68, `C4267` 33 등. 64비트 정수/포인터 축소 변환). `Classes\`(우리 코드)에서는 0건이며 엔진 소스는 수정하지 않았다.
