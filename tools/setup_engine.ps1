@@ -82,7 +82,7 @@ if (Test-Path $versionFile) {
 
 # 3-1) x64 / optional-module patches (tools\patches\engine-3.17.2-x64\*.patch)
 # The engine tree lives outside the repo, so the patch files are the source of truth for our engine changes.
-# They only add branches (x64 paths, COCOS_USE_* options), so the Win32 build keeps working unchanged.
+# They turn the engine into an x64-only build (win64 prebuilt paths, COCOS_USE_* options default OFF).
 # core.autocrlf=false: git apply would otherwise rewrite the (LF) engine files with CRLF.
 $patchDir = Join-Path $PSScriptRoot 'patches\engine-3.17.2-x64'
 if (Test-Path $patchDir) {

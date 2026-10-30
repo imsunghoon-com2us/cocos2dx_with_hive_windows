@@ -7,7 +7,7 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 - 플랫폼: **x64 전용**. Hive SDK 네이티브 DLL이 x64뿐이라 Phase 6부터 x86(Win32) 빌드를 지원하지 않는다
   (`DodgeGame/CMakeLists.txt`가 Win32 configure를 오류로 막고, `build.ps1`은 `-Arch`를 받지 않는다).
   - 3.17.2에 데스크톱 x64 프리빌트가 없어 `tools/build_deps_x64.ps1`로 직접 빌드한 라이브러리를 쓴다(`docs/05-x64-migration.md`).
-  - 네트워크 모듈(`HttpClient`, `WebSocket`, `SocketIO`, `Downloader`, assets-manager)과 Bullet/Box2D는 **제외**된다(`COCOS_USE_NETWORK=OFF`, `COCOS_USE_BULLET_BOX2D=OFF`).
+  - 네트워크 모듈(`HttpClient`, `WebSocket`, `SocketIO`, `Downloader`, assets-manager)과 Bullet/Box2D는 **제외**된다(엔진 패치에서 `COCOS_USE_NETWORK`, `COCOS_USE_BULLET_BOX2D`의 기본값이 OFF).
 - CMake 3.31.x (4.x 사용 금지), Python 2.7.18 (cocos 콘솔용)
 - 환경 점검: `tools/check_env.ps1`
 
@@ -28,8 +28,9 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 ## 디렉터리 규칙
 - `DodgeGame/cocos2d/`는 엔진 junction이며 git에서 제외된다. **직접 수정하지 않는다.**
   엔진을 고쳐야 하면 `tools/patches/engine-3.17.2-x64/*.patch`에 패치로 추가한다(`setup_engine.ps1`이 멱등하게 적용).
-  패치 파일은 LF 줄바꿈을 유지한다(`.gitattributes`). 현재 패치에는 x86용 분기(`CMAKE_SIZEOF_VOID_P` 분기, `COCOS_USE_*` 기본 ON)가
-  비활성 상태로 남아 있다. 동작에는 영향이 없고, 정리하려면 패치 재생성과 콜드 재현 재검증이 필요하다.
+  패치 파일은 LF 줄바꿈을 유지한다(`.gitattributes`). 패치 수정 절차: 엔진 파일을 직접 고친 뒤 원본(`%TEMP%\engine_orig`처럼 따로 보관한 사본)과
+  `diff -u --label a/<경로> --label b/<경로>`로 패치를 다시 만들고, 원본 사본에 적용해 편집본과 바이트 일치하는지 확인한다.
+  패치는 x64 전용이다(x86 분기는 Phase 7에서 제거했다).
 - Hive SDK 연동 어댑터는 `HiveCocos/`(cocos 무의존 핵심 + `CocosDispatcher.cpp` 한 파일만 cocos 의존)에 둔다. 코드는 ASCII/영문 주석으로 쓴다.
 - `tools/*.ps1`은 **PowerShell로 다시 쓰지 않는다**(BOM 변환 직후 파일이 사라진 사례가 반복됨). BOM이 필요하면 내용 맨 앞에 BOM 문자(U+FEFF)를 넣어 Write 도구로 한 번에 만든다.
 - 게임 코드는 `DodgeGame/Classes/`에 둔다. 새 파일은 `DodgeGame/CMakeLists.txt`에 등록한다

@@ -32,9 +32,8 @@ if ($Clean -and (Test-Path $BuildDir)) { Remove-Item $BuildDir -Recurse -Force }
 # configure가 중간에 실패하면 CMakeCache.txt만 남으므로 생성된 솔루션 유무로 판단한다.
 if (-not (Test-Path (Join-Path $BuildDir 'ALL_BUILD.vcxproj'))) {
     if (Test-Path $BuildDir) { Remove-Item $BuildDir -Recurse -Force }
-    # x64용 curl/openssl/libwebsockets/libuv/Box2D/Bullet 빌드는 없다(docs/05-x64-migration.md).
-    $cfgArgs = @('-S', $Src, '-B', $BuildDir, '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v141',
-                 '-DCOCOS_USE_NETWORK=OFF', '-DCOCOS_USE_BULLET_BOX2D=OFF')
+    # 엔진 패치의 COCOS_USE_NETWORK / COCOS_USE_BULLET_BOX2D 기본값이 OFF다(x64용 curl/openssl/websockets/uv/Box2D/Bullet 빌드가 없음, docs/05).
+    $cfgArgs = @('-S', $Src, '-B', $BuildDir, '-G', 'Visual Studio 17 2022', '-A', 'x64', '-T', 'v141')
     & $cmake @cfgArgs
     if ($LASTEXITCODE -ne 0) { throw "cmake configure failed ($LASTEXITCODE)" }
 }

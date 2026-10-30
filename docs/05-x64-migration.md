@@ -27,8 +27,8 @@ cocos2d-x 3.17.2는 Win32(x86)로만 빌드되어 있었으므로 엔진과 게�
 
 | 패치 | 내용 |
 |---|---|
-| `0001-x64-prebuilt-paths` | `CocosExternalConfig.cmake`에 `CMAKE_SIZEOF_VOID_P EQUAL 8` 분기(`win_arch_dir`, `win_prebuilt_subdir`)를 추가하고, 경로가 `win32`로 고정돼 있던 `zlib`, `sqlite3`, `win32-specific/{gles,icon,MP3Decoder,OggDecoder,OpenalSoft}`가 이 변수를 쓰게 함. Win32에서는 값이 이전과 같다 |
-| `0002-optional-network-and-bullet-box2d` | 옵션 `COCOS_USE_NETWORK`, `COCOS_USE_BULLET_BOX2D`(기본 ON = 기존 동작) 추가. OFF면 network 소스, assets-manager 소스, curl/openssl/uv/websockets/Box2D/Bullet 타깃을 빼고 `CC_USE_3D_PHYSICS=0` 정의 |
+| `0001-x64-prebuilt-paths` | `CocosExternalConfig.cmake`가 `win64` 경로(`win_arch_dir`, `win_prebuilt_subdir`)를 쓰게 하고(Phase 5에는 `CMAKE_SIZEOF_VOID_P EQUAL 8` 분기였으나 Phase 7에서 x64 전용으로 단순화), 경로가 `win32`로 고정돼 있던 `zlib`, `sqlite3`, `win32-specific/{gles,icon,MP3Decoder,OggDecoder,OpenalSoft}`가 이 변수를 쓰게 함 |
+| `0002-optional-network-and-bullet-box2d` | 옵션 `COCOS_USE_NETWORK`, `COCOS_USE_BULLET_BOX2D` 추가(Phase 5에는 기본 ON = 기존 동작이었으나 Phase 7에서 **기본 OFF**로 변경). OFF면 network 소스, assets-manager 소스, curl/openssl/uv/websockets/Box2D/Bullet 타깃을 빼고 `CC_USE_3D_PHYSICS=0` 정의 |
 | `0003-x64-source-fixes` | `UIEditBoxImpl-win32.cpp`: `GWL_WNDPROC`/`GWL_USERDATA` -> `GWLP_*` (64비트에서는 정의되지 않아 컴파일 실패). `ccMacros.h`: `CC_LITTLE_ENDIAN`을 `_M_IX86 || _M_X64`일 때 1로 |
 
 **`CC_LITTLE_ENDIAN` 버그는 컴파일은 되지만 동작이 틀리는 종류라** 실측으로 확인했다. 실제 엔진 헤더를 x64로 컴파일해 값을 출력:
@@ -114,3 +114,11 @@ Phase 2에서 1회, Phase 5에서 서브에이전트 작업 중 `build_deps_x64.
 - x64 라이브러리는 Release 위주다(chipmunk만 Debug 포함). Debug x64 exe(`/MDd`)는 `/MD`로 빌드한 정적 라이브러리를 링크하므로 링커 경고 `LNK4098`(`MSVCRT` 기본 라이브러리 충돌)이 1건 나온다. 빌드·실행·시험은 문제없었다(Win32 프리빌트도 같은 구조). 힙 할당/해제가 라이브러리와 exe 경계를 넘는 코드에서 Debug CRT 단언이 날 수 있으니 Debug 시험에서 이상이 보이면 먼저 의심한다.
 - x64 Debug 빌드에는 엔진 코드의 컴파일러 경고가 약 880건 있다(`C4244` 766, `C4305` 68, `C4267` 33 등. 64비트 정수/포인터 축소 변환). `Classes\`(우리 코드)에서는 0건이며 엔진 소스는 수정하지 않았다.
 - 서브에이전트 보고 중 일부(버전, 출력명 교정)는 직접 재검증하지 않았다. 산출물의 비트 수와 엔진 빌드·실행으로 간접 확인했다.
+
+## Phase 7: 엔진 패치의 x86 분기 정리
+x86 지원을 제거했으므로(`docs/06`) 패치에 남아 있던 x86용 경로를 걷어냈다(브랜치 `phase7/engine-patch-cleanup`).
+- `0001`: `CocosExternalConfig.cmake`의 `CMAKE_SIZEOF_VOID_P` 분기를 없애고 `win64` 경로를 무조건 쓴다.
+- `0002`: `COCOS_USE_NETWORK`, `COCOS_USE_BULLET_BOX2D` 기본값을 ON에서 OFF로 바꿨다. 그래서 `tools/build.ps1`이 더 이상 `-DCOCOS_USE_*=OFF`를 넘기지 않는다(플래그 없는 새 configure로 같은 구성이 되는지 확인).
+- `0003`은 그대로(`GWLP_*`, `CC_LITTLE_ENDIAN`은 x64용 수정이라 유지).
+- 패치는 원본 13개 파일 사본에 적용해 편집된 엔진과 바이트 일치함을 확인했고, 이미 적용된 엔진에서는 `--reverse --check`로 감지된다.
+- 엔진 소스의 x86 코드(예: `ccMacros.h`의 `_M_IX86` 조건)는 원본 코드라 건드리지 않았다.
