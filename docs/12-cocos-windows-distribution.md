@@ -105,10 +105,11 @@ README(`proj.win32/README.md`)에 사용자용 절차가 있다. 요약:
   원인: setter 호출은 DLL이 **빈 문자열**을 돌려주고(더미 값으로 직접 확인) 이를 파싱하면 null 값인데, `picojson::value::get(key)`는 객체에만 정의돼 있다(검사는 `PICOJSON_ASSERT`라 컴파일에서 빠져 Release에서는 우연히 넘어가고 Debug에서 죽는다).
   추적 로그 코드가 null 값에 `get()`을 불렀다. 수정: 객체인지 먼저 확인하는 `field()` 도우미를 쓰고, `callNative`는 객체가 아닌 반환을 **빈 객체**로 돌려줘 호출하는 쪽의 `get()`도 안전하게 했으며, `callEngine`은 파싱할 수 없는 응답을 무시한다(원본은 `//return;`으로 막혀 있었다).
   Debug CRT로 같은 호출(`setConfigurations`, `setAppId`, `getAppId`)을 하는 시험 exe가 크래시 없이 종료(종료 코드 0)하는 것을 확인했다. 이 크래시는 `showSignIn` 멈춤과는 별개다.
-- 샘플 `showSignIn` 재시험 결과는 아직 없다.
+- **사용자 재시험 결과(Debug 샘플)**: `AuthV4.setup`(약관 동의 후 응답), `showSignIn`(명시적 로그인 팝업 표시), 로그인, `getPlayerInfo`, `signOut`까지 모두 정상 동작했다. 추적 로그상 순서는 `setup` 요청, 콜백(SDK 스레드, `code=0`), `showSignIn` 요청이었다.
+  처음의 `showSignIn` 멈춤이 DLL 동적 로드와 콜백 1회 등록 중 무엇 때문에 해결됐는지는 한 번에 같이 바꿔서 가리지 못했다(일시적 현상이었을 가능성도 배제하지 못함). 현재 구조는 DodgeGame(`HiveCocos`)과 같은 방식이다.
 
 ## 미확인 / 한계
-- **샘플 UI로 실제 호출을 눌러 보지 못했다**: `AuthV4.setup`/`signIn`/`showSignIn`, IAPV4, Promotion, Chat 등. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다. 사람이 확인해야 한다.
+- **샘플 UI로 확인한 것은 AuthV4의 `setup`, `showSignIn`, 로그인, `getPlayerInfo`, `signOut`까지다.** `isAutoSignIn`(자동 로그인), `playerDelete`(1회용 계정으로만), IAPV4, Promotion, Chat, Release 빌드 실행, 미지원 클래스(`NOT_SUPPORTED`)의 화면 표시는 사람 확인 전이다. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다.
 - `HttpClient_win32.cpp`의 실패 응답, `BaseView_win32.cpp`는 컴파일만 했고 화면에서 실행하지 못했다.
 - 플러그인의 비동기 요청은 메서드당 리스너 하나만 보관한다(원본 설계). 같은 API를 응답 전에 다시 부르면 앞의 리스너가 덮어써진다.
 - Android/iOS 프로젝트가 변경 후에도 빌드되는지는 이 PC에서 확인할 수 없다(`Classes` 변경은 Windows 가드 안이거나 표준 include 추가뿐이고, 원본 zip과의 diff로 확인).
