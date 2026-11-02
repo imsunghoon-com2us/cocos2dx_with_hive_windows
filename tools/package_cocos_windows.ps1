@@ -35,16 +35,27 @@ if (Test-Path $Output) { Remove-Item $Output -Force }
 $count = 0
 $zip = [IO.Compression.ZipFile]::Open($Output, 'Create')
 try {
-    foreach ($p in $parts) {
-        $base = Join-Path $SampleRoot $p
-        Get-ChildItem $base -Recurse -File -Force | ForEach-Object {
-            $rel = $_.FullName.Substring($SampleRoot.Length + 1)
-            if ($rel -match '(^|\\)(build-x64|lib_build\\build-x64)(\\|$)') { return }
+    # Walk the folders by hand and never enter build-x64: a run of the sample leaves a CEF cache there whose folders
+    # deny access, and Get-ChildItem -Recurse would fail on them before any filter could skip them.
+    $pending = New-Object 'System.Collections.Generic.Stack[string]'
+    foreach ($p in $parts) { $pending.Push((Join-Path $SampleRoot $p)) }
+    while ($pending.Count -gt 0) {
+        $dir = $pending.Pop()
+        foreach ($item in Get-ChildItem -LiteralPath $dir -Force) {
+            if ($item.PSIsContainer) {
+                if ($item.Name -ne 'build-x64') { $pending.Push($item.FullName) }
+                continue
+            }
+            $rel = $item.FullName.Substring($SampleRoot.Length + 1)
             $entryName = $rootName + '/' + ($rel -replace '\\', '/')
-            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entryName, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
-            $script:count++
+            [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $item.FullName, $entryName, [IO.Compression.CompressionLevel]::Optimal) | Out-Null
+            $count++
         }
     }
+} catch {
+    $zip.Dispose()
+    if (Test-Path $Output) { Remove-Item $Output -Force }     # never leave a partial zip behind
+    throw
 } finally { $zip.Dispose() }
 
 $hash = (Get-FileHash $Output -Algorithm SHA256).Hash
