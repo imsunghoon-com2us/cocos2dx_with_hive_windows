@@ -108,8 +108,21 @@ README(`proj.win32/README.md`)에 사용자용 절차가 있다. 요약:
 - **사용자 재시험 결과(Debug 샘플)**: `AuthV4.setup`(약관 동의 후 응답), `showSignIn`(명시적 로그인 팝업 표시), 로그인, `getPlayerInfo`, `signOut`까지 모두 정상 동작했다. 추적 로그상 순서는 `setup` 요청, 콜백(SDK 스레드, `code=0`), `showSignIn` 요청이었다.
   처음의 `showSignIn` 멈춤이 DLL 동적 로드와 콜백 1회 등록 중 무엇 때문에 해결됐는지는 한 번에 같이 바꿔서 가리지 못했다(일시적 현상이었을 가능성도 배제하지 못함). 현재 구조는 DodgeGame(`HiveCocos`)과 같은 방식이다.
 
+## 종료 시 CEF 잔류 (사용자 시험, 2026-11-02)
+정상 종료(창 닫기) 뒤에 `cef.subprocess.exe`가 남았고, 그다음 실행에서 약관/로그인 팝업이 뜨지 않았다. 확인한 것: 남은 4개(gpu-process, utility 2, renderer)는 부모 프로세스가 이미 없는 고아였다.
+같은 날 앞선 실행(추적 로그가 있는 실행)은 `showSignIn`을 누른 뒤 로그인 창을 닫아 `-1200032`(사용자 취소) 콜백으로 끝났다. 팝업이 안 뜬 실행에는 추적 로그가 없다(그 실행은 `HIVE_PLUGIN_TRACE`를 켜지 않았다). 그 사이 빌드는 바뀌지 않았다.
+DodgeGame(`HiveService::shutdown`)은 종료할 때 `AuthV4.terminateProcess`로 SDK를 끝낸 뒤 자기 자식 CEF를 종료하는데, 샘플에는 이 단계가 없었다.
+- 추가: Windows 전용 `hive::HiveCppPlugin::shutdown()`. SDK를 한 번이라도 불렀다면 `AuthV4::terminateProcess()`를 호출하고 이 프로세스의 자식 `cef.subprocess.exe`를 종료한다(SDK를 안 썼으면 DLL을 로드하지 않고 아무것도 안 한다). 샘플 `AppDelegate` 소멸자에서 호출한다(DodgeGame과 같은 위치).
+- 한계: 앱이 비정상 종료(크래시, 작업 관리자 종료)하면 호출되지 않아 CEF가 남을 수 있다. 이전 실행에서 남은 CEF가 다음 실행의 약관/로그인 팝업을 막는지는 DodgeGame에서 사용자가 확인한 현상과 같은 모양이지만, 이번 샘플 실행에서 직접 가려내지는 못했다.
+- **확인(사용자 시험 + 프로세스 점검, 2026-11-02)**:
+  - Release: `AuthV4.setup`을 눌렀지만 약관이 안 뜬 상태(CEF 5개 실행 중)에서 X로 닫았을 때 `cef.subprocess.exe`가 남지 않았다.
+  - Release: 약관 동의 후 `showSignIn` 로그인 팝업이 떠 있는 상태에서 닫았을 때도 남지 않았다. 추적 로그: `AuthV4.terminateProcess` 뒤 `SHUTDOWN terminated 4 cef.subprocess child process(es)`. 이전(종료 정리 없음)에는 같은 조건에서 고아가 남았다.
+  - Debug 빌드에도 같은 코드가 들어 있으나 종료 정리를 Debug에서 따로 시험하지는 않았다.
+- **새 exe 폴더의 첫 `setup`에서 약관이 안 뜬 일**: Release 폴더(새 폴더)에서 처음 실행해 `setup`을 눌렀을 때 약관이 1분 넘게 안 떴고 네트워크 연결도 없었다(`TEST_HiveProperty.dat` 352B 생성). 정상 종료한 뒤 다시 실행하자 약관과 로그인 팝업이 정상으로 떴다.
+  Debug 첫 실행과 DodgeGame에서 `build-x64`를 지운 뒤의 첫 실행에서도 같은 모양이 있었다. 새 폴더의 첫 실행에서 생기는 현상일 가능성이 있지만 원인은 확정하지 못했다(첫 실행에는 추적 로그가 없었다).
+
 ## 미확인 / 한계
-- **샘플 UI로 확인한 것은 AuthV4의 `setup`, `showSignIn`, 로그인, `getPlayerInfo`, `signOut`까지다.** `isAutoSignIn`(자동 로그인), `playerDelete`(1회용 계정으로만), IAPV4, Promotion, Chat, Release 빌드 실행, 미지원 클래스(`NOT_SUPPORTED`)의 화면 표시는 사람 확인 전이다. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다.
+- **샘플 UI로 확인한 것은 AuthV4의 `setup`, `showSignIn`, 로그인, `getPlayerInfo`, `signOut`까지다.** Release 빌드는 `setup`, 약관, `showSignIn` 팝업과 종료 정리까지 확인했다(로그인 완료 이후 흐름은 Debug에서 확인). `isAutoSignIn`(자동 로그인), `playerDelete`(1회용 계정으로만), IAPV4, Promotion, Chat, 미지원 클래스(`NOT_SUPPORTED`)의 화면 표시는 사람 확인 전이다. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다.
 - `HttpClient_win32.cpp`의 실패 응답, `BaseView_win32.cpp`는 컴파일만 했고 화면에서 실행하지 못했다.
 - 플러그인의 비동기 요청은 메서드당 리스너 하나만 보관한다(원본 설계). 같은 API를 응답 전에 다시 부르면 앞의 리스너가 덮어써진다.
 - Android/iOS 프로젝트가 변경 후에도 빌드되는지는 이 PC에서 확인할 수 없다(`Classes` 변경은 Windows 가드 안이거나 표준 include 추가뿐이고, 원본 zip과의 diff로 확인).
