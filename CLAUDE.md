@@ -60,4 +60,6 @@ cocos2d-x 3.17.2 기반 Windows 미니게임(`DodgeGame`) 프로젝트. 전체 �
 
 ## 인계 (새 세션은 먼저 읽을 것)
 - 현재 상태, 이 PC의 함정, 남은 작업은 `docs/09-handoff.md`에 정리돼 있다. Phase 9(다운로드 소스 SHA256 고정 + Hive SDK 고정 다운로드, `docs/10-sha256-pinning.md`)와 Phase 10(타이틀/로그인/설정 메뉴, `docs/11-title-login-settings.md`)까지 `main`에 병합돼 있다.
+- Phase 11(Windows 배포판, `docs/12-cocos-windows-distribution.md`): `HIVE_SDK_Cocos_Sample/`(회사 Android/iOS 배포 샘플 + 우리가 추가한 `PluginSource/Windows`, `proj.win32`)와 `Hive_SDK_v4_Cocos2d-x_*.zip`은 **독점 소스와 실제 키가 들어 있어 `.gitignore`로 제외**돼 있다. 절대 커밋하지 않는다(`git add`는 경로 지정).
+  배포 zip은 `tools/package_cocos_windows.ps1`로 만든다. 샘플 폴더 안의 키 값은 출력하지 않는다.
 - 미확인 항목(로그아웃, 자동 로그인, 한글 입력 IME, `<market>` 조합)은 확인된 것처럼 말하지 말고 미확인으로 다룬다.

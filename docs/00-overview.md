@@ -48,6 +48,7 @@ cocos2dx_with_hive_windows/
 | 8 | Hive 로그인과 AppId. 브랜치 `phase8/hive-login` | `docs/08-hive-login.md`, `HiveCocos`의 `signIn`/`showSignIn`/`signOut`, `setup_hive.ps1 -AppId`, `hive.local.json` | 단위 시험, `L` 키로 로그인 UI 표시, **사용자 확인: 실제 로그인/로그아웃/자동 로그인** |
 | 9 | 다운로드 소스 SHA256 고정(19개) + Hive SDK 고정 버전 다운로드. 브랜치 `phase9/sha256-pinning` | `docs/10-sha256-pinning.md`, `tools/hive_sdk.json`, `tools/fetch_hive.ps1`, `build_deps_x64.ps1`/`setup_engine.ps1`/`setup_hive.ps1` 수정 | 정상 통과, 변조 시 명확한 오류로 중단(부정·변이 시험), 단위 시험 회귀 없음 |
 | 10 | 타이틀 화면, 초기화 후 자동/명시적 로그인, 설정 메뉴(로그아웃, 계정 삭제), 실패 팝업과 재시도. 브랜치 `phase10/title-login-settings` | `docs/11-title-login-settings.md`, `TitleScene`, `SettingsMenu`, `ModalDialog`, `HiveService` 개편, `HiveAuthV4::playerDelete`/`isAutoSignIn` | 단위 시험 146개, SDK 없는 환경과 로그인 취소로 재시도 정책 확인, **사용자 확인: 로그인 후 시작/로그아웃/계정 삭제, IME** |
+| 11 | Hive SDK v4 cocos2d-x **Windows 배포판**: 회사의 Android/iOS 배포 샘플(`HIVE_SDK_Cocos_Sample`)과 같은 구조로 `PluginSource/Windows`, `proj.win32` 추가. 브랜치 `phase11/cocos-windows-distribution` | `docs/12-cocos-windows-distribution.md`, `tools/package_cocos_windows.ps1` (샘플 폴더와 배포 zip은 git 제외) | 플러그인 계층 시험 10개(실제 DLL), 샘플 Debug/Release 빌드, zip을 새 경로에 풀어 빌드, **사용자 확인: 샘플 UI로 AuthV4 등 실제 호출** |
 
 Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작이 확인된 뒤에만 `main`에 `--no-ff`로 병합한다.
 
@@ -67,5 +68,7 @@ Phase 5~6은 단계별 브랜치에서 작업하고, 모두 끝나 정상 동작
   Hive SDK는 `tools/hive_sdk.json` 고정 버전을 `tools/fetch_hive.ps1`로 받는다(최신은 확인만, 갱신은 `-Update`). 자세한 내용과 시험은 `docs/10-sha256-pinning.md`
 - [x] Phase 10: 타이틀 화면 + 자동/명시적 로그인 + 설정 메뉴(로그아웃/계정 삭제) (브랜치 `phase10/title-login-settings`, `main` 병합 완료). 구현, 단위 시험 146개, SDK 없는 환경과 로그인 취소로 재시도 정책, 종료 시 CEF 프로세스 정리 확인까지 완료. 약관은 정상 노출 확인(`propFolder\REAL_HiveProperty.dat` 삭제로 재시험 가능).
   **미확인(사람 확인이 필요했고 결과를 전달받지 못함)**: 로그인 후 시작/로그아웃/자동 로그인, 계정 삭제(1회용 계정), 게스트 판별(`providerInfoData` 실제 모양), 한글 입력(IME) (`docs/11-title-login-settings.md`)
+- [x] Phase 11: Hive SDK v4 cocos2d-x Windows 배포판 (브랜치 `phase11/cocos-windows-distribution`). 원본 샘플의 C++ 플러그인(JSON 브리지)에 Windows 구현(`HIVE_PLUGIN_CPP.dll` 호출, 콜백을 게임 스레드로 넘기는 `setCallbackDispatcher`, Windows 미지원 클래스는 `NOT_SUPPORTED` 응답)을 더하고 샘플 `Classes`를 Windows 분기로 빌드했다.
+  플러그인 시험 10개 통과, 샘플 Debug/Release 빌드와 zip 재현 빌드 성공, 샘플 창 기동 확인. **미확인**: 샘플 UI로 `AuthV4.setup`/로그인, IAPV4, Promotion, Chat 등 실제 호출(새 exe 폴더는 약관 동의가 필요하다). 산출물은 git 제외(독점 소스와 키 포함), 자세한 내용은 `docs/12`
 
 Phase 5부터 빌드는 x64 전용이다. `docs/01~04`는 Win32 시절의 기록이므로 해당 명령(`-Arch` 없이 Win32 빌드 등)은 더 이상 유효하지 않다. 현재 규칙은 `CLAUDE.md`를 따른다.

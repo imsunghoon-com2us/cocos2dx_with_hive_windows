@@ -33,3 +33,7 @@ DodgeGame/build-x64/
 
 # Local Hive settings (AppId etc.), read by tools/setup_hive.ps1
 hive.local.json
+
+# Hive SDK cocos2d-x distribution sample (proprietary sources + real keys) and its zips - local only
+HIVE_SDK_Cocos_Sample/
+Hive_SDK_v4_Cocos2d-x_*.zip
