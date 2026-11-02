@@ -100,7 +100,12 @@ README(`proj.win32/README.md`)에 사용자용 절차가 있다. 요약:
   | 종료 시 CEF 정리 | `terminateCefChildren` | 없음 | 같음(고아 CEF가 남을 수 있음) |
   | 구성 | AppId/zone만 설정 | 샘플 UI의 많은 설정(`startv4`, HiveTheme, 권한 화면 등) | 같음 |
 - 추적용으로 환경 변수 `HIVE_PLUGIN_TRACE=1`이면 exe 옆 `hive_plugin_trace.log`에 요청/반환/콜백(시각, 스레드, `class.method`, 결과 코드)을 기록한다. 내용(토큰, ID)은 쓰지 않는다.
-- 위 변경 뒤 실제 DLL로 플러그인 시험 10개 재통과(동적 로드, 추적 로그 확인). 샘플 `showSignIn` 재시험 결과는 아직 없다.
+- 위 변경 뒤 실제 DLL로 플러그인 시험 10개 재통과(동적 로드, 추적 로그 확인).
+- **재시험에서 새 크래시(제가 추가한 코드의 버그)**: 첫 화면 하단 OK 버튼(`ConfigurationAPIKey::apply` -> `Configuration::setConfigurations`)에서 샘플이 접근 위반으로 종료(`std::map::_Lbound`, 스택은 `trace` -> `picojson::value::get`).
+  원인: setter 호출은 DLL이 **빈 문자열**을 돌려주고(더미 값으로 직접 확인) 이를 파싱하면 null 값인데, `picojson::value::get(key)`는 객체에만 정의돼 있다(검사는 `PICOJSON_ASSERT`라 컴파일에서 빠져 Release에서는 우연히 넘어가고 Debug에서 죽는다).
+  추적 로그 코드가 null 값에 `get()`을 불렀다. 수정: 객체인지 먼저 확인하는 `field()` 도우미를 쓰고, `callNative`는 객체가 아닌 반환을 **빈 객체**로 돌려줘 호출하는 쪽의 `get()`도 안전하게 했으며, `callEngine`은 파싱할 수 없는 응답을 무시한다(원본은 `//return;`으로 막혀 있었다).
+  Debug CRT로 같은 호출(`setConfigurations`, `setAppId`, `getAppId`)을 하는 시험 exe가 크래시 없이 종료(종료 코드 0)하는 것을 확인했다. 이 크래시는 `showSignIn` 멈춤과는 별개다.
+- 샘플 `showSignIn` 재시험 결과는 아직 없다.
 
 ## 미확인 / 한계
 - **샘플 UI로 실제 호출을 눌러 보지 못했다**: `AuthV4.setup`/`signIn`/`showSignIn`, IAPV4, Promotion, Chat 등. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다. 사람이 확인해야 한다.
