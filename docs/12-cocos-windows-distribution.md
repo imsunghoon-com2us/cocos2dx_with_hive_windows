@@ -50,7 +50,8 @@ HIVE_SDK_Cocos_Sample/
 
 ## 플러그인 변경 (`PluginSource/Windows`)
 Android 소스 23개 중 `HIVE_JniHelper.cpp`, `HIVE_OtherPlatformEmptyImpl.cpp`(없는 `HIVE_IAP.h`를 include해 그대로는 컴파일되지 않고, Windows 구현과 심볼이 겹침)를 뺀 21개를 복사했다. 줄바꿈은 원본 파일의 것을 유지했다.
-- **`HIVE_CppPlugin.cpp`**(Windows 전용으로 새로 작성): `HIVE_PLUGIN_CPP.lib`로 세 export를 부른다. 콜백은 매 호출 전에 등록하고, 반환 문자열은 복사한 뒤 `HiveCPP_destroyCallNativeReturn`으로 해제한다(원본 Win32 분기는 초기화되지 않은 포인터를 해제할 수 있었다).
+- **`HIVE_CppPlugin.cpp`**(Windows 전용으로 새로 작성): `HIVE_PLUGIN_CPP.dll`을 **첫 호출 때** exe 폴더에서 `LoadLibraryEx`로 로드해 세 export를 부른다(import 라이브러리를 링크하지 않는다. 처음 버전은 `.lib`로 암시적 링크해 프로세스 시작 시 로드했고 콜백을 매 호출마다 등록했는데,
+  샘플에서 `showSignIn` 때 멈춤이 나와 `HiveCocos`와 같은 방식으로 바꿨다. "Windows 샘플 멈춤 조사" 절). 콜백은 한 번만 등록하고, 반환 문자열은 복사한 뒤 `HiveCPP_destroyCallNativeReturn`으로 해제한다(원본 Win32 분기는 초기화되지 않은 포인터를 해제할 수 있었다).
   - `HiveCppPlugin::setCallbackDispatcher(std::function<void(std::function<void()>)>)` 추가(Windows 전용). 지정하면 모든 응답이 그 함수를 통해 전달된다. 지정하지 않으면 Android/iOS처럼 받은 스레드에서 바로 호출한다. 플러그인은 cocos에 의존하지 않는다.
   - Windows 네이티브에 구현이 없는 클래스(`Push`, `ProviderGoogle/Apple/Funtap`, `SocialHive/Facebook/Google`)는 `callNative`에서 가로채 `NOT_SUPPORTED`(`code -2`, `errorCode -13` CommonNotSupported) 응답을 만들어 같은 경로(디스패처)로 전달한다. 리스너가 영영 안 불리는 일을 막는다.
 - **Windows SDK 구현에서 이식한 차이**: `selectedPlayerId`/`playerId`/`playerIdList`를 문자열이 아닌 숫자로 전송, `AuthV4::terminateProcess` 실제 호출, `IAPV4::purchase`의 `quantity`를 숫자로,
@@ -72,8 +73,8 @@ Android 파일 `BaseView_android.cpp`와 같은 방식으로 새 파일은 전�
 
 ## 빌드와 배포
 README(`proj.win32/README.md`)에 사용자용 절차가 있다. 요약:
-1. `proj.win32\build_hivesdk_lib.ps1 -HiveSdkRoot <HiveSDKWindows>`: Debug/Release `HIVE_SDK.lib`를 `hivesdk\lib\v141\x64`에 만든다(Debug lib는 약 130MB, zip에서는 압축됨).
-2. `proj.win32\build.ps1 -CocosRoot <엔진> -HiveSdkRoot <HiveSDKWindows> -Config Debug|Release`
+1. `proj.win32\build_hivesdk_lib.ps1`: Debug/Release `HIVE_SDK.lib`를 `hivesdk\lib\v141\x64`에 만든다(Debug lib는 약 130MB, zip에서는 압축됨).
+2. `proj.win32\build.ps1 -CocosRoot <엔진> -Config Debug|Release` (Hive SDK 패키지 경로는 빌드에 필요 없고 3번의 DLL 복사에만 쓴다)
 3. `proj.win32\setup_hive_runtime.ps1 -HiveSdkRoot <HiveSDKWindows> -Config ...`: SDK DLL과 config를 exe 옆에 복사(`tools/setup_hive.ps1`과 같은 배치, 선택적으로 `-AppId`, `-Zone`).
 4. 배포 zip: `tools\package_cocos_windows.ps1` -> `Hive_SDK_v4_Cocos2d-x_Windows_26.7.0.zip`(최상위 `HIVE_SDK_Cocos_Sample/`, `Classes`, `Resources`, `PluginSource/Windows`, `proj.win32`. `v1`, `c2s`, Android/iOS 프로젝트, SDK DLL, 엔진은 없음).
 엔진은 이 저장소의 패치된 3.17.2 x64 엔진(`DodgeGame/cocos2d`)을 `-CocosRoot`로 썼다. 공식 3.17에는 x64 데스크톱 프리빌트가 없다(`docs/05`).
@@ -84,6 +85,22 @@ README(`proj.win32/README.md`)에 사용자용 절차가 있다. 요약:
 - 샘플 앱 Debug/Release 빌드 성공(오류 없음). Debug exe를 실행해 창과 Configuration(키 입력) 화면이 뜨는 것을 스크린샷으로 확인했다.
 - zip(176개 파일, 약 19MB)을 새 짧은 경로에 풀어 `build.ps1 -Config Release`로 빌드: 성공(엔진 포함 전체 빌드, 프리빌트 `HIVE_SDK.lib` 사용). zip만으로 재현된다.
 - `Classes/`는 원본 zip과 비교해 수정 8개(`AppDelegate.cpp`, `BaseView.cpp`, `ChatDataManager.hpp`, `ChatParamScene.cpp`, `Configuration.cpp`, `IAPV4Test.cpp`, `Postbox.cpp`)와 새 파일 2개뿐이다(수정은 위 표의 가드 또는 표준 헤더 include 추가). `Resources/`는 동일하다.
+
+## Windows 샘플 멈춤 조사 (사용자 시험, 2026-11-02)
+사용자가 Debug 샘플을 실행해 `AuthV4.setup`(약관 동의 후 `isAutoSignIn`, `did`, 결과값 정상 출력)까지 확인했고, 이어서 `showSignIn`을 누르자 **창이 멈췄다**(아무 동작 없음, 로그인 창 안 보임).
+- 처음에는 약관이 안 떴고 같은 인스턴스 안에서 나중에 떴다. 이전 실행의 `cef.subprocess.exe` 고아 4개가 있었고(부모 프로세스 없음) 종료한 뒤 재실행했을 때는 떴다. 잔류 CEF의 영향인지 타이밍인지는 구분하지 못했다.
+- 멈춘 인스턴스: Windows가 `Responding=False`로 표시, 메인 스레드 스택 1회 샘플은 `Application::run`의 프레임 대기(`Sleep`)였고(플러그인 호출 안에서 영구 대기는 아님), 화면은 정상으로 그려졌지만 로그인 창은 없었고, CEF는 떠 있었지만 활성 네트워크 연결은 없었다. 원인은 확정하지 못했다.
+- **DodgeGame(HiveCocos)과의 적용 차이**를 비교해 아래를 고쳤다(어느 것이 원인인지는 사용자 재시험 전까지 미확인):
+  | 항목 | DodgeGame / HiveCocos | 샘플 첫 버전 | 지금 |
+  |---|---|---|---|
+  | DLL 로드 | 게임 창 생성 뒤 `LoadLibraryEx`로 동적 로드 | `.lib` 암시적 링크로 프로세스 시작 시 로드 | 첫 호출 때 동적 로드 |
+  | SDK 콜백 등록 | 시작 시 한 번 | 호출할 때마다 | 한 번 |
+  | 응답 라우팅 | 요청마다 handlerId | 메서드별 전역 리스너(원본 방식) | 같음(원본 방식) |
+  | 입력 차단 | 로그인/팝업 중 게임 키 입력 무시 | 없음(샘플 UI가 계속 입력을 받음) | 같음 |
+  | 종료 시 CEF 정리 | `terminateCefChildren` | 없음 | 같음(고아 CEF가 남을 수 있음) |
+  | 구성 | AppId/zone만 설정 | 샘플 UI의 많은 설정(`startv4`, HiveTheme, 권한 화면 등) | 같음 |
+- 추적용으로 환경 변수 `HIVE_PLUGIN_TRACE=1`이면 exe 옆 `hive_plugin_trace.log`에 요청/반환/콜백(시각, 스레드, `class.method`, 결과 코드)을 기록한다. 내용(토큰, ID)은 쓰지 않는다.
+- 위 변경 뒤 실제 DLL로 플러그인 시험 10개 재통과(동적 로드, 추적 로그 확인). 샘플 `showSignIn` 재시험 결과는 아직 없다.
 
 ## 미확인 / 한계
 - **샘플 UI로 실제 호출을 눌러 보지 못했다**: `AuthV4.setup`/`signIn`/`showSignIn`, IAPV4, Promotion, Chat 등. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다. 사람이 확인해야 한다.
