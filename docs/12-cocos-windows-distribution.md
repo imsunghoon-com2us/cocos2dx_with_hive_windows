@@ -1,0 +1,94 @@
+# 12. Hive SDK v4 cocos2d-x Windows 배포판 (Phase 11)
+
+## 목적과 범위
+회사가 Android/iOS용으로 배포해 온 Hive SDK v4 cocos2d-x 샘플(`HIVE_SDK_Cocos_Sample`, 원본 zip `Hive_SDK_v4_Cocos2d-x_Android_iOS_26.7.0.zip`)과
+**같은 구조와 소스 형식**으로 Windows(x64) 배포판을 만든다. DodgeGame과 `HiveCocos`(우리 어댑터)와는 별개의 산출물이다.
+
+사용자 결정:
+- **git에는 올리지 않는다.** 샘플 폴더에 Hive 독점 소스(`PluginSource`)와 실제 키(`Classes/ConfigurationAPIKey.cpp`, `hive_config.xml`, `google-services.json` 등)가 들어 있고 저장소는 public이다.
+  `.gitignore`에 `HIVE_SDK_Cocos_Sample/`과 `Hive_SDK_v4_Cocos2d-x_*.zip`을 넣었고, 저장소에는 이 문서, `tools/package_cocos_windows.ps1`만 있다.
+- 범위는 `Classes/` 전체(v4 시험 화면 모두). `v1/`, `c2s/`는 JNI/Objective-C 전용 레거시라 Windows에서 제외.
+- 구조는 샘플 폴더에 `proj.win32/`와 `PluginSource/Windows/`를 추가(Android의 `proj.android`, `PluginSource/Android`에 대응).
+- 샘플 키(`ConfigurationAPIKey.cpp`)는 Android/iOS와 같은 값 그대로(사내 배포 전제).
+
+## 원본 배포판 구조 (조사 결과)
+- `PluginSource/Android/{include,src}`는 사실상 공용 C++ 플러그인이다. 모든 API가 picojson `{"class","method","platform":"cpp",...}`를 만들어 `HiveCPP_CallNative` 하나로 보내고,
+  응답은 `HiveCppPlugin::callEngine`이 `class`로 `<Class>::executeEngine`을 골라 `method`별 전역 리스너를 호출한다(handlerId 없음). iOS의 `.mm`은 이 JSON 브리지의 네이티브 쪽이다.
+- Android는 이 소스를 미리 빌드한 `jni/hivesdk/lib/c++/<abi>/libHIVE_SDK.a` + `include/HIVE_SDK_Plugin`으로 배포한다(소스는 참고용).
+- `HIVE_CppPlugin.cpp`에 Win32 분기(`HIVE_PLUGIN_PLATFORM_WIN32`)가 이미 있고, 네이티브 DLL이 `HiveCPP_CallNative`, `HiveCPP_destroyCallNativeReturn`, `SetHiveSendMessageCallback`을 내보내면 된다.
+  Windows SDK의 `HIVE_PLUGIN_CPP.dll`이 정확히 이 셋을 내보낸다(`HiveCocos`의 `DllTransport`도 같은 셋을 쓴다).
+- Windows SDK 패키지(`HiveSDKWindows/Private/CPP/HIVE_*.cpp`, UE용)에도 레거시 `hive::` API의 Windows 구현 11개가 있지만 **Android 26.7.0 소스보다 오래됐다**
+  (`ageRangeSource`, `isNewUser`, GameStats가 없음). 그래서 Android 소스를 기준으로 하고 Windows 구현의 차이만 이식했다.
+  UE 쪽에서는 `SetHiveSendMessageCallback(callEngine)`이 주석 처리돼 레거시 비동기 콜백이 실제로 돈 적이 없었다(코드 조사). 아래 0단계로 직접 확인했다.
+
+## 0단계 검증: 레거시 방식(handlerId 없음)이 Windows DLL에서 동작하는가
+`HIVE_PLUGIN_CPP.dll`에 `platform:"cpp"`, handlerId 없는 요청을 직접 보냈다(스크래치 프로브, 사용자 상태는 `propFolder` 비교로 변화 없음 확인).
+- 동기 호출(`Configuration.getHiveSDKVersion`)은 반환 문자열로 `4.26.7.0`을 돌려준다.
+- 비동기(`Configuration.getMetaData`)는 `class`, `method`, `platform`, `resultAPI`를 담은 응답이 콜백으로 온다. **handlerId 없이도 class/method로 라우팅할 수 있다.**
+- 콜백은 **SDK 내부 스레드**에서 호출된다(메인 스레드가 아님). 그래서 플러그인에 디스패처 훅을 넣었다.
+- DLL은 `resultAPI.latencyMS`(대문자 S)를 보낸다. 플러그인의 `ResultAPI`는 `latencyMs`를 읽으므로 이 값은 비어 있다(iOS와 같은 현상, 기능 영향 없음).
+
+## 구조
+```
+HIVE_SDK_Cocos_Sample/
+  Classes/, Resources/                 Android/iOS와 공유 (Windows 분기만 추가)
+  PluginSource/
+    Android/, iOS/                     원본 그대로 (Windows 배포판 zip에는 넣지 않음)
+    Windows/
+      include/                         Android 헤더 + HiveCppPlugin::setCallbackDispatcher
+      src/                             Android 소스 + Windows 변경 (아래)
+  proj.win32/
+    CMakeLists.txt                     앱 (x64, MSVC v141, v1/c2s 제외)
+    build.ps1, build_hivesdk_lib.ps1, setup_hive_runtime.ps1, README.md
+    hivesdk/
+      CMakeLists.txt                   타깃 HIVE_SDK (프리빌트 lib 또는 소스 빌드)
+      include/HIVE_SDK_Plugin/         헤더
+      lib/v141/x64/{Debug,Release}/HIVE_SDK.lib
+      lib_build/CMakeLists.txt         lib만 빌드 (build_hivesdk_lib.ps1)
+    main.cpp, main.h, resource.h, game.rc, res/   (DodgeGame의 cocos 템플릿 파일)
+```
+
+## 플러그인 변경 (`PluginSource/Windows`)
+Android 소스 23개 중 `HIVE_JniHelper.cpp`, `HIVE_OtherPlatformEmptyImpl.cpp`(없는 `HIVE_IAP.h`를 include해 그대로는 컴파일되지 않고, Windows 구현과 심볼이 겹침)를 뺀 21개를 복사했다. 줄바꿈은 원본 파일의 것을 유지했다.
+- **`HIVE_CppPlugin.cpp`**(Windows 전용으로 새로 작성): `HIVE_PLUGIN_CPP.lib`로 세 export를 부른다. 콜백은 매 호출 전에 등록하고, 반환 문자열은 복사한 뒤 `HiveCPP_destroyCallNativeReturn`으로 해제한다(원본 Win32 분기는 초기화되지 않은 포인터를 해제할 수 있었다).
+  - `HiveCppPlugin::setCallbackDispatcher(std::function<void(std::function<void()>)>)` 추가(Windows 전용). 지정하면 모든 응답이 그 함수를 통해 전달된다. 지정하지 않으면 Android/iOS처럼 받은 스레드에서 바로 호출한다. 플러그인은 cocos에 의존하지 않는다.
+  - Windows 네이티브에 구현이 없는 클래스(`Push`, `ProviderGoogle/Apple/Funtap`, `SocialHive/Facebook/Google`)는 `callNative`에서 가로채 `NOT_SUPPORTED`(`code -2`, `errorCode -13` CommonNotSupported) 응답을 만들어 같은 경로(디스패처)로 전달한다. 리스너가 영영 안 불리는 일을 막는다.
+- **Windows SDK 구현에서 이식한 차이**: `selectedPlayerId`/`playerId`/`playerIdList`를 문자열이 아닌 숫자로 전송, `AuthV4::terminateProcess` 실제 호출, `IAPV4::purchase`의 `quantity`를 숫자로,
+  `Configuration::setUseHercules`/`setUsePrivateBrowsingForAuth`/`get·setEnableGameController`.
+- **MSVC 호환**: MSVC는 `static_cast<enum>(double)`을 거부한다(clang은 허용). `HIVE_CppPlugin.h`에 `hive::jsonNumberCast<T>`(부동소수점은 그대로, 정수와 enum은 `long long`을 거침)를 추가해
+  `HIVE_SETVALUEFROMJSONNUMBER` 매크로와 `AuthV4.cpp`의 enum 변환 5곳에 썼다.
+
+## 샘플 앱 변경 (`Classes/`, 모두 `CC_TARGET_PLATFORM == CC_PLATFORM_WIN32` 분기 또는 Windows 전용 파일)
+| 파일 | 변경 |
+|---|---|
+| `AppDelegate.cpp` | 시작 시 `setCallbackDispatcher`로 응답을 `performFunctionInCocosThread`에 연결 |
+| `BaseView_win32.cpp`(새) | `StartActivityIndicator`/`EndActivityIndicator`(로그만) |
+| `HttpClient_win32.cpp`(새) | 엔진의 network 모듈이 없어 `network::HttpClient` 구현을 제공: 모든 요청이 즉시 실패 응답(cocos 스레드로 전달) |
+| `Configuration.cpp` | v1/C2S 헤더, 버튼, 시작 함수를 Windows에서 제외(빈 함수) |
+| `Postbox.cpp`, `ChatParamScene.cpp` | v0(C2S)/v1 데이터 매니저 include와 로그인 분기를 Windows에서 제외 |
+| `IAPV4Test.cpp` | Windows에도 `marketPidList` 입력칸을 만들어 없는 위젯을 읽는 문제 방지 |
+| `BaseView.cpp`, `ChatDataManager.hpp` | MSVC에서 빠진 `<ctime>`, `<cctype>` include 추가 |
+Android 파일 `BaseView_android.cpp`와 같은 방식으로 새 파일은 전체를 플랫폼 가드로 감싸 Android의 `Classes/*.cpp` glob에 들어가도 영향이 없게 했다.
+
+## 빌드와 배포
+README(`proj.win32/README.md`)에 사용자용 절차가 있다. 요약:
+1. `proj.win32\build_hivesdk_lib.ps1 -HiveSdkRoot <HiveSDKWindows>`: Debug/Release `HIVE_SDK.lib`를 `hivesdk\lib\v141\x64`에 만든다(Debug lib는 약 130MB, zip에서는 압축됨).
+2. `proj.win32\build.ps1 -CocosRoot <엔진> -HiveSdkRoot <HiveSDKWindows> -Config Debug|Release`
+3. `proj.win32\setup_hive_runtime.ps1 -HiveSdkRoot <HiveSDKWindows> -Config ...`: SDK DLL과 config를 exe 옆에 복사(`tools/setup_hive.ps1`과 같은 배치, 선택적으로 `-AppId`, `-Zone`).
+4. 배포 zip: `tools\package_cocos_windows.ps1` -> `Hive_SDK_v4_Cocos2d-x_Windows_26.7.0.zip`(최상위 `HIVE_SDK_Cocos_Sample/`, `Classes`, `Resources`, `PluginSource/Windows`, `proj.win32`. `v1`, `c2s`, Android/iOS 프로젝트, SDK DLL, 엔진은 없음).
+엔진은 이 저장소의 패치된 3.17.2 x64 엔진(`DodgeGame/cocos2d`)을 `-CocosRoot`로 썼다. 공식 3.17에는 x64 데스크톱 프리빌트가 없다(`docs/05`).
+
+## 검증 결과
+- 플러그인 계층 시험(스크래치 `plugintest.exe`, 실제 `HIVE_PLUGIN_CPP.dll`, 약관이 필요 없는 호출만): 10개 모두 통과.
+  동기 호출(`getHiveSDKVersion`, `setAppId/getAppId`), 비동기 응답 도착, 디스패처 없을 때 SDK 스레드/있을 때 호출 스레드에서 실행, `Push` NOT_SUPPORTED(`code -2`, `errorCode -13`)와 그 응답의 스레드.
+- 샘플 앱 Debug/Release 빌드 성공(오류 없음). Debug exe를 실행해 창과 Configuration(키 입력) 화면이 뜨는 것을 스크린샷으로 확인했다.
+- zip(176개 파일, 약 19MB)을 새 짧은 경로에 풀어 `build.ps1 -Config Release`로 빌드: 성공(엔진 포함 전체 빌드, 프리빌트 `HIVE_SDK.lib` 사용). zip만으로 재현된다.
+- `Classes/`는 원본 zip과 비교해 수정 8개(`AppDelegate.cpp`, `BaseView.cpp`, `ChatDataManager.hpp`, `ChatParamScene.cpp`, `Configuration.cpp`, `IAPV4Test.cpp`, `Postbox.cpp`)와 새 파일 2개뿐이다(수정은 위 표의 가드 또는 표준 헤더 include 추가). `Resources/`는 동일하다.
+
+## 미확인 / 한계
+- **샘플 UI로 실제 호출을 눌러 보지 못했다**: `AuthV4.setup`/`signIn`/`showSignIn`, IAPV4, Promotion, Chat 등. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다. 사람이 확인해야 한다.
+- `HttpClient_win32.cpp`의 실패 응답, `BaseView_win32.cpp`는 컴파일만 했고 화면에서 실행하지 못했다.
+- 플러그인의 비동기 요청은 메서드당 리스너 하나만 보관한다(원본 설계). 같은 API를 응답 전에 다시 부르면 앞의 리스너가 덮어써진다.
+- Android/iOS 프로젝트가 변경 후에도 빌드되는지는 이 PC에서 확인할 수 없다(`Classes` 변경은 Windows 가드 안이거나 표준 include 추가뿐이고, 원본 zip과의 diff로 확인).
+- Windows 네이티브에 있는데도 시험하지 않은 클래스(IAPV4, Promotion, Chat, MatchMaking, DataStore, PlatformHelper, SocialV4, Analytics)는 플러그인 코드가 Android와 같고 DLL 쪽 지원 여부는 문자열 조사로만 확인했다(`showExit`, `registerLocalPush` 등은 DLL에 이름이 없었다).
+- 샘플 키가 `Classes/ConfigurationAPIKey.cpp`에 그대로 들어 있다(사용자 결정). 배포 범위를 정할 때 유의한다.
