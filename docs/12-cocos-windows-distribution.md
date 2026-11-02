@@ -114,10 +114,15 @@ README(`proj.win32/README.md`)에 사용자용 절차가 있다. 요약:
 DodgeGame(`HiveService::shutdown`)은 종료할 때 `AuthV4.terminateProcess`로 SDK를 끝낸 뒤 자기 자식 CEF를 종료하는데, 샘플에는 이 단계가 없었다.
 - 추가: Windows 전용 `hive::HiveCppPlugin::shutdown()`. SDK를 한 번이라도 불렀다면 `AuthV4::terminateProcess()`를 호출하고 이 프로세스의 자식 `cef.subprocess.exe`를 종료한다(SDK를 안 썼으면 DLL을 로드하지 않고 아무것도 안 한다). 샘플 `AppDelegate` 소멸자에서 호출한다(DodgeGame과 같은 위치).
 - 한계: 앱이 비정상 종료(크래시, 작업 관리자 종료)하면 호출되지 않아 CEF가 남을 수 있다. 이전 실행에서 남은 CEF가 다음 실행의 약관/로그인 팝업을 막는지는 DodgeGame에서 사용자가 확인한 현상과 같은 모양이지만, 이번 샘플 실행에서 직접 가려내지는 못했다.
-- 이 수정 뒤 종료 시 CEF가 남지 않는지는 사용자 재시험 전까지 미확인이다.
+- **확인(사용자 시험 + 프로세스 점검, 2026-11-02)**:
+  - Release: `AuthV4.setup`을 눌렀지만 약관이 안 뜬 상태(CEF 5개 실행 중)에서 X로 닫았을 때 `cef.subprocess.exe`가 남지 않았다.
+  - Release: 약관 동의 후 `showSignIn` 로그인 팝업이 떠 있는 상태에서 닫았을 때도 남지 않았다. 추적 로그: `AuthV4.terminateProcess` 뒤 `SHUTDOWN terminated 4 cef.subprocess child process(es)`. 이전(종료 정리 없음)에는 같은 조건에서 고아가 남았다.
+  - Debug 빌드에도 같은 코드가 들어 있으나 종료 정리를 Debug에서 따로 시험하지는 않았다.
+- **새 exe 폴더의 첫 `setup`에서 약관이 안 뜬 일**: Release 폴더(새 폴더)에서 처음 실행해 `setup`을 눌렀을 때 약관이 1분 넘게 안 떴고 네트워크 연결도 없었다(`TEST_HiveProperty.dat` 352B 생성). 정상 종료한 뒤 다시 실행하자 약관과 로그인 팝업이 정상으로 떴다.
+  Debug 첫 실행과 DodgeGame에서 `build-x64`를 지운 뒤의 첫 실행에서도 같은 모양이 있었다. 새 폴더의 첫 실행에서 생기는 현상일 가능성이 있지만 원인은 확정하지 못했다(첫 실행에는 추적 로그가 없었다).
 
 ## 미확인 / 한계
-- **샘플 UI로 확인한 것은 AuthV4의 `setup`, `showSignIn`, 로그인, `getPlayerInfo`, `signOut`까지다.** `isAutoSignIn`(자동 로그인), `playerDelete`(1회용 계정으로만), IAPV4, Promotion, Chat, Release 빌드 실행, 미지원 클래스(`NOT_SUPPORTED`)의 화면 표시는 사람 확인 전이다. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다.
+- **샘플 UI로 확인한 것은 AuthV4의 `setup`, `showSignIn`, 로그인, `getPlayerInfo`, `signOut`까지다.** Release 빌드는 `setup`, 약관, `showSignIn` 팝업과 종료 정리까지 확인했다(로그인 완료 이후 흐름은 Debug에서 확인). `isAutoSignIn`(자동 로그인), `playerDelete`(1회용 계정으로만), IAPV4, Promotion, Chat, 미지원 클래스(`NOT_SUPPORTED`)의 화면 표시는 사람 확인 전이다. 새 exe 폴더는 처음 `setup`에서 이용약관 동의(사람)가 필요하다.
 - `HttpClient_win32.cpp`의 실패 응답, `BaseView_win32.cpp`는 컴파일만 했고 화면에서 실행하지 못했다.
 - 플러그인의 비동기 요청은 메서드당 리스너 하나만 보관한다(원본 설계). 같은 API를 응답 전에 다시 부르면 앞의 리스너가 덮어써진다.
 - Android/iOS 프로젝트가 변경 후에도 빌드되는지는 이 PC에서 확인할 수 없다(`Classes` 변경은 Windows 가드 안이거나 표준 include 추가뿐이고, 원본 zip과의 diff로 확인).
